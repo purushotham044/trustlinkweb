@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── TrustLink Design Tokens (exact match to mobile app) ── */
+
+  /* Backgrounds */
+  --color-background: #0A0E1A;
+  --color-surface: #111827;
+  --color-surface-elevated: #1A2235;
+  --color-surface-border: #1E293B;
+
+  /* Primary — Cyan */
+  --color-primary: #00D4FF;
+  --color-primary-dim: #0099BB;
+  --color-primary-muted: rgba(0, 212, 255, 0.12);
+
+  /* Status */
+  --color-success: #10B981;
+  --color-success-muted: rgba(16, 185, 129, 0.12);
+  --color-warning: #F59E0B;
+  --color-warning-muted: rgba(245, 158, 11, 0.12);
+  --color-danger: #EF4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.12);
+
+  /* Blockchain — Purple */
+  --color-blockchain: #8B5CF6;
+  --color-blockchain-muted: rgba(139, 92, 246, 0.12);
+
+  /* Text */
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #475569;
+  --color-text-inverse: #0A0E1A;
+
+  /* Borders */
+  --color-border: #1E293B;
+  --color-border-light: #2D3748;
+
+  /* Fonts */
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Global Base Styles ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-dim);
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(0, 212, 255, 0.25);
+  color: var(--color-text-primary);
+}
+
+/* ── Focus visible ── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Utility classes ── */
+.font-mono {
+  font-family: var(--font-family-mono);
+}
+
+.text-gradient-primary {
+  background: linear-gradient(135deg, #00D4FF, #0099BB);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-blockchain {
+  background: linear-gradient(135deg, #8B5CF6, #00D4FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.border-primary-glow {
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3), 0 4px 24px rgba(0, 212, 255, 0.08);
+}
+
+.border-blockchain-glow {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4), 0 4px 24px rgba(139, 92, 246, 0.1);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.card-surface {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.card-elevated {
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
