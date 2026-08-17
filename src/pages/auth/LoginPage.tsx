@@ -47,9 +47,20 @@ export function LoginPage() {
         {/* Card */}
         <div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-8">
           {error && (
-            <div className="flex items-start gap-2 bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 mb-6">
-              <span className="text-[#EF4444]">⚠</span>
-              <p className="text-sm text-[#EF4444]">{error}</p>
+            <div className="flex items-start gap-2.5 bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 mb-6">
+              <span className="text-[#EF4444] text-base leading-none">⚠</span>
+              <div className="flex-1">
+                <p className="text-sm text-[#EF4444] font-medium">{error}</p>
+                {error.toLowerCase().includes('invalid login credentials') && (
+                  <p className="text-xs text-[#94A3B8] mt-1.5 leading-relaxed">
+                    If you haven't created an account yet, please{' '}
+                    <Link to="/register" className="text-[#00D4FF] hover:underline font-semibold">
+                      create an account here
+                    </Link>{' '}
+                    or verify your password.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
