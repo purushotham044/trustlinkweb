@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
 export function LoginPage() {
-  const { signInWithEmail, signInWithGoogle, loading } = useAuth();
+  const { signInWithEmail, signInWithGoogle, signInAsDemo, loading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -83,9 +83,24 @@ export function LoginPage() {
             <div className="flex-1 h-px bg-[#1E293B]" />
           </div>
 
-          <Button variant="ghost" size="md" fullWidth onClick={handleGoogle} disabled={loading}>
-            <span className="mr-2 text-base">G</span> Continue with Google
-          </Button>
+          <div className="flex flex-col gap-3 mt-4">
+            <Button variant="ghost" size="md" fullWidth onClick={handleGoogle} disabled={loading}>
+              <span className="mr-2 text-base">G</span> Continue with Google
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              fullWidth
+              onClick={() => {
+                signInAsDemo();
+                navigate('/app/dashboard');
+              }}
+            >
+              ⚡ Instant Demo Sign-In
+            </Button>
+          </div>
         </div>
 
         <p className="text-center text-sm text-[#475569] mt-6">
