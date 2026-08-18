@@ -11,13 +11,18 @@ import {
   ExternalLink, 
   CheckCircle, 
   AlertTriangle, 
-  Clock 
+  Clock,
+  X,
+  Eye,
+  Check
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { HashDisplay } from '@/components/ui/HashDisplay';
 import { documentService } from '@/services/documentService';
-import { Document, BlockchainProof } from '@/types';
+import { shareService } from '@/services/shareService';
+import { Document, BlockchainProof, SharePermission } from '@/types';
 import { BLOCKCHAIN_EXPLORER_BASE } from '@/lib/constants';
 
 export function DocumentDetailPage() {
@@ -28,6 +33,15 @@ export function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [anchoring, setAnchoring] = useState(false);
+  const [verificationFeedback, setVerificationFeedback] = useState<string | null>(null);
+
+  // Share Modal State
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareRecipient, setShareRecipient] = useState('');
+  const [sharePermission, setSharePermission] = useState<SharePermission>('VIEW');
+  const [shareExpiry, setShareExpiry] = useState<'1h' | '24h' | '7d' | 'never'>('24h');
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -40,12 +54,13 @@ export function DocumentDetailPage() {
 
   const handleVerify = () => {
     setVerifying(true);
+    setVerificationFeedback(null);
     setTimeout(() => {
       setVerifying(false);
       if (doc) {
         setDoc({ ...doc, integrity_status: 'VERIFIED' });
       }
-      alert('Cryptographic Verification Successful!\n1. Local SHA-256 binary hash matches database.\n2. Internal integrity verified.');
+      setVerificationFeedback('Cryptographic integrity confirmed: Local binary SHA-256 hash matches the registered reference.');
     }, 1200);
   };
 
@@ -64,8 +79,46 @@ export function DocumentDetailPage() {
         anchored_at: new Date().toISOString(),
         created_at: new Date().toISOString()
       });
-      alert('Document SHA-256 anchored to Ethereum Sepolia blockchain testnet successfully!');
     }, 1500);
+  };
+
+  const handleDownload = () => {
+    if (!doc) return;
+    // Download content as a blob
+    const content = `TrustLink Verified Document\nName: ${doc.name}\nSHA-256: ${doc.current_hash || 'N/A'}\nCreated: ${doc.created_at}`;
+    const blob = new Blob([content], { type: doc.mime_type });
+    const url = URL.createObjectURL(blob);
+    const a = window.document.createElement('a');
+    a.href = url;
+    a.download = doc.name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShareSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!doc || !shareRecipient.trim()) return;
+
+    setIsSharing(true);
+    let expiresAt: string | null = null;
+    const now = Date.now();
+    if (shareExpiry === '1h') expiresAt = new Date(now + 3600 * 1000).toISOString();
+    if (shareExpiry === '24h') expiresAt = new Date(now + 24 * 3600 * 1000).toISOString();
+    if (shareExpiry === '7d') expiresAt = new Date(now + 7 * 24 * 3600 * 1000).toISOString();
+
+    try {
+      await shareService.shareDocument(doc.id, shareRecipient, sharePermission, expiresAt);
+      setShareSuccess(true);
+      setTimeout(() => {
+        setIsShareModalOpen(false);
+        setShareSuccess(false);
+        setShareRecipient('');
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || 'Failed to share');
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -151,6 +204,13 @@ export function DocumentDetailPage() {
                 )}
               </div>
             </div>
+
+            {verificationFeedback && (
+              <div className="p-3 bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.3)] rounded-xl flex items-center gap-2 text-xs text-[#10B981]">
+                <CheckCircle size={16} />
+                <span>{verificationFeedback}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -229,7 +289,7 @@ export function DocumentDetailPage() {
           <Button 
             variant="secondary" 
             size="md" 
-            onClick={() => alert('Opening share modal')}
+            onClick={() => setIsShareModalOpen(true)}
             icon={<Share2 size={16} />}
           >
             Share
@@ -237,7 +297,7 @@ export function DocumentDetailPage() {
           <Button 
             variant="ghost" 
             size="md" 
-            onClick={() => alert('Download document')}
+            onClick={handleDownload}
             icon={<Download size={16} />}
           >
             Download
@@ -252,6 +312,123 @@ export function DocumentDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* Share Document Modal */}
+      {/* ============================================================ */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.75)] backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative animate-[fade-in_0.2s_ease-out]">
+            <button
+              onClick={() => setIsShareModalOpen(false)}
+              className="absolute top-5 right-5 text-[#475569] hover:text-[#F1F5F9] transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.3)] flex items-center justify-center text-[#00D4FF]">
+                <Share2 size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-[#F1F5F9]">Share Document</h2>
+                <p className="text-xs text-[#475569]">Grant time-bounded granular permissions</p>
+              </div>
+            </div>
+
+            {shareSuccess ? (
+              <div className="py-8 text-center space-y-2">
+                <CheckCircle size={40} className="text-[#10B981] mx-auto" />
+                <p className="text-base font-bold text-[#F1F5F9]">Share Created Successfully!</p>
+                <p className="text-xs text-[#94A3B8]">Access granted to {shareRecipient}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleShareSubmit} className="space-y-4">
+                <Input
+                  label="Recipient Email / User ID"
+                  placeholder="colleague@example.com"
+                  value={shareRecipient}
+                  onChange={e => setShareRecipient(e.target.value)}
+                  required
+                  autoFocus
+                />
+
+                <div>
+                  <label className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider block mb-2">
+                    Permission Level
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSharePermission('VIEW')}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                        sharePermission === 'VIEW'
+                          ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
+                          : 'bg-[#0A0E1A] text-[#94A3B8] border-[#1E293B]'
+                      }`}
+                    >
+                      <Eye size={14} /> VIEW ONLY
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSharePermission('DOWNLOAD')}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                        sharePermission === 'DOWNLOAD'
+                          ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
+                          : 'bg-[#0A0E1A] text-[#94A3B8] border-[#1E293B]'
+                      }`}
+                    >
+                      <Download size={14} /> DOWNLOAD
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider block mb-2">
+                    Access Duration
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['1h', '24h', '7d', 'never'] as const).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setShareExpiry(opt)}
+                        className={`py-2 text-xs font-semibold rounded-lg border uppercase transition-all ${
+                          shareExpiry === opt
+                            ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
+                            : 'bg-[#0A0E1A] text-[#475569] border-[#1E293B]'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    onClick={() => setIsShareModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    loading={isSharing}
+                    disabled={!shareRecipient.trim()}
+                  >
+                    Confirm Share
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

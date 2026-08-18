@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Folder as FolderIcon, 
@@ -12,11 +12,17 @@ import {
   Clock, 
   CheckCircle, 
   AlertTriangle,
-  ArrowLeft
+  ArrowLeft,
+  X,
+  Hash,
+  Check
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { useDocuments } from '@/hooks/useDocuments';
+import { documentService } from '@/services/documentService';
+import { computeFileSha256 } from '@/lib/crypto';
 import { Document, Folder } from '@/types';
 
 export function VaultPage() {
@@ -24,9 +30,27 @@ export function VaultPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { documents, folders, loading, error, refresh } = useDocuments(currentFolderId);
 
+  // Modals state
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  
+  // Upload modal state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [computedHash, setComputedHash] = useState<string | null>(null);
+  const [isCalculatingHash, setIsCalculatingHash] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadTargetFolder, setUploadTargetFolder] = useState<string | null>(currentFolderId);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // New folder state
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+
   const filteredDocs = documents.filter(doc => 
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const currentFolder = folders.find(f => f.id === currentFolderId);
 
   const getFileIcon = (mime: string) => {
     if (mime.includes('pdf')) return <FileText size={20} className="text-[#EF4444]" />;
@@ -39,6 +63,59 @@ export function VaultPage() {
   const formatSize = (bytes: number) => {
     if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    setIsCalculatingHash(true);
+    setComputedHash(null);
+
+    try {
+      const hash = await computeFileSha256(file);
+      setComputedHash(hash);
+    } catch (err) {
+      console.warn('Hash computation error:', err);
+    } finally {
+      setIsCalculatingHash(false);
+    }
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    try {
+      await documentService.uploadDocument(selectedFile, uploadTargetFolder);
+      setIsUploadOpen(false);
+      setSelectedFile(null);
+      setComputedHash(null);
+      await refresh();
+    } catch (err: any) {
+      alert(err.message || 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCreateFolderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+
+    setIsCreatingFolder(true);
+    try {
+      await documentService.createFolder(newFolderName, currentFolderId);
+      setIsNewFolderOpen(false);
+      setNewFolderName('');
+      await refresh();
+    } catch (err: any) {
+      alert(err.message || 'Folder creation failed');
+    } finally {
+      setIsCreatingFolder(false);
+    }
   };
 
   return (
@@ -56,16 +133,35 @@ export function VaultPage() {
                   <ArrowLeft size={14} /> Back to Root
                 </button>
               )}
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#F1F5F9]">Document Vault</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#F1F5F9]">
+                {currentFolder ? currentFolder.name : 'Document Vault'}
+              </h1>
             </div>
-            <p className="text-[#94A3B8] text-sm">Manage and cryptographically verify all stored documents.</p>
+            <p className="text-[#94A3B8] text-sm">
+              {currentFolder 
+                ? `Browsing contents of folder "${currentFolder.name}"`
+                : 'Manage, organize, and cryptographically verify all stored documents.'}
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" icon={<Plus size={16} />} onClick={() => alert('Folder creation in web client demo')}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              icon={<Plus size={16} />} 
+              onClick={() => setIsNewFolderOpen(true)}
+            >
               New Folder
             </Button>
-            <Button variant="primary" size="sm" icon={<Upload size={16} />} onClick={() => alert('Document upload via Supabase storage')}>
+            <Button 
+              variant="primary" 
+              size="sm" 
+              icon={<Upload size={16} />} 
+              onClick={() => {
+                setUploadTargetFolder(currentFolderId);
+                setIsUploadOpen(true);
+              }}
+            >
               Upload Document
             </Button>
           </div>
@@ -85,8 +181,8 @@ export function VaultPage() {
           </div>
         </div>
 
-        {/* Folders Section */}
-        {folders.length > 0 && (
+        {/* Folders Section (Only at root or when subfolders exist) */}
+        {!currentFolderId && folders.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xs font-bold text-[#475569] uppercase tracking-widest mb-3">Folders</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -131,10 +227,21 @@ export function VaultPage() {
           ) : filteredDocs.length === 0 ? (
             <div className="text-center py-16 bg-[#111827] border border-[#1E293B] rounded-2xl">
               <FileText size={36} className="text-[#475569] mx-auto mb-3" />
-              <p className="text-base font-semibold text-[#F1F5F9] mb-1">No documents found</p>
-              <p className="text-sm text-[#475569] mb-4">
-                {searchQuery ? 'Try a different search query' : 'Upload your first document to begin securing files.'}
+              <p className="text-base font-semibold text-[#F1F5F9] mb-1">No documents in this view</p>
+              <p className="text-sm text-[#475569] mb-6">
+                {searchQuery ? 'Try a different search query' : 'Upload your first document to calculate SHA-256 and anchor proof.'}
               </p>
+              <Button 
+                variant="primary" 
+                size="sm" 
+                icon={<Upload size={16} />}
+                onClick={() => {
+                  setUploadTargetFolder(currentFolderId);
+                  setIsUploadOpen(true);
+                }}
+              >
+                Upload Document Now
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -180,6 +287,202 @@ export function VaultPage() {
           )}
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* Upload Document Modal */}
+      {/* ============================================================ */}
+      {isUploadOpen && (
+        <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.75)] backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-[#1E293B] rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative animate-[fade-in_0.2s_ease-out]">
+            <button
+              onClick={() => {
+                setIsUploadOpen(false);
+                setSelectedFile(null);
+                setComputedHash(null);
+              }}
+              className="absolute top-5 right-5 text-[#475569] hover:text-[#F1F5F9] transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.3)] flex items-center justify-center text-[#00D4FF]">
+                <Upload size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-[#F1F5F9]">Upload to Vault</h2>
+                <p className="text-xs text-[#475569]">Generates deterministic SHA-256 binary fingerprint</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUploadSubmit} className="space-y-5">
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+
+              {/* Dropzone / Picker */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-[#1E293B] hover:border-[#00D4FF] rounded-2xl p-6 text-center cursor-pointer transition-all bg-[#0A0E1A] group"
+              >
+                {selectedFile ? (
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="w-10 h-10 rounded-lg bg-[#1A2235] border border-[#1E293B] flex items-center justify-center text-[#00D4FF] shrink-0">
+                      {getFileIcon(selectedFile.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[#F1F5F9] truncate">{selectedFile.name}</p>
+                      <p className="text-xs text-[#475569]">{formatSize(selectedFile.size)}</p>
+                    </div>
+                    <span className="text-xs text-[#00D4FF] group-hover:underline shrink-0">Change</span>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload size={32} className="text-[#475569] group-hover:text-[#00D4FF] mx-auto mb-2 transition-colors" />
+                    <p className="text-sm font-semibold text-[#F1F5F9] mb-1">Click to select a document</p>
+                    <p className="text-xs text-[#475569]">PDF, Word, Excel, Images, or Text (up to 50 MB)</p>
+                  </div>
+                )}
+              </div>
+
+              {/* SHA-256 Calculation State */}
+              {isCalculatingHash && (
+                <div className="flex items-center gap-2 p-3 bg-[#0A0E1A] border border-[#1E293B] rounded-xl text-xs text-[#00D4FF]">
+                  <div className="w-3.5 h-3.5 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin" />
+                  Calculating binary SHA-256 checksum in browser...
+                </div>
+              )}
+
+              {computedHash && (
+                <div className="p-3 bg-[#0A0E1A] border border-[rgba(0,212,255,0.3)] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-1">
+                      <Check size={12} /> SHA-256 Calculated
+                    </span>
+                    <span className="text-[9px] text-[#475569]">Deterministic</span>
+                  </div>
+                  <code className="text-[11px] text-[#00D4FF] font-mono break-all block leading-tight">
+                    {computedHash}
+                  </code>
+                </div>
+              )}
+
+              {/* Folder Selector */}
+              {folders.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider block mb-1.5">
+                    Save to Folder
+                  </label>
+                  <select
+                    value={uploadTargetFolder || ''}
+                    onChange={e => setUploadTargetFolder(e.target.value || null)}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm text-[#F1F5F9] bg-[#0A0E1A] border-[#1E293B] outline-none focus:border-[#00D4FF]"
+                  >
+                    <option value="">(Root Vault)</option>
+                    {folders.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setIsUploadOpen(false);
+                    setSelectedFile(null);
+                    setComputedHash(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  loading={isUploading}
+                  disabled={!selectedFile || isCalculatingHash}
+                  icon={<Upload size={16} />}
+                >
+                  Confirm &amp; Store
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* Create New Folder Modal */}
+      {/* ============================================================ */}
+      {isNewFolderOpen && (
+        <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.75)] backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative animate-[fade-in_0.2s_ease-out]">
+            <button
+              onClick={() => {
+                setIsNewFolderOpen(false);
+                setNewFolderName('');
+              }}
+              className="absolute top-5 right-5 text-[#475569] hover:text-[#F1F5F9] transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.3)] flex items-center justify-center text-[#F59E0B]">
+                <FolderIcon size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-[#F1F5F9]">New Vault Folder</h2>
+                <p className="text-xs text-[#475569]">Organize your verifiable records</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateFolderSubmit} className="space-y-5">
+              <Input
+                label="Folder Name"
+                placeholder="e.g. Real Estate Deeds"
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                autoFocus
+                required
+              />
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setIsNewFolderOpen(false);
+                    setNewFolderName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  loading={isCreatingFolder}
+                  disabled={!newFolderName.trim()}
+                  icon={<Plus size={16} />}
+                >
+                  Create Folder
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
