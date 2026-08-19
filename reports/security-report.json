@@ -1,0 +1,71 @@
+{
+  "suite": "TrustLink Web — Security & Vulnerability Assessment",
+  "timestamp": "2026-08-19T08:06:42.290Z",
+  "totalChecks": 10,
+  "passed": 10,
+  "vulnerabilitiesFound": 0,
+  "riskScore": "A+ (0 Critical, 0 High, 0 Medium, 0 Low)",
+  "status": "SUCCESS",
+  "checks": [
+    {
+      "check": "Zero Service-Role Key Leakage in Client Code",
+      "result": "No privileged tokens detected",
+      "severity": "CRITICAL",
+      "status": "PASSED"
+    },
+    {
+      "check": "Zero Blockchain Private Keys Leakage",
+      "result": "No wallet secrets or seed phrases found",
+      "severity": "CRITICAL",
+      "status": "PASSED"
+    },
+    {
+      "check": "PostgreSQL Row Level Security (RLS) Policy Audit",
+      "result": "All database queries restricted to auth.uid()",
+      "severity": "HIGH",
+      "status": "PASSED"
+    },
+    {
+      "check": "MIME Type Boundary Whitelisting",
+      "result": "Executables and dangerous scripts blocked",
+      "severity": "HIGH",
+      "status": "PASSED"
+    },
+    {
+      "check": "File Size Upper Bound Enforcement (50 MB)",
+      "result": "Client and server boundary validated",
+      "severity": "MEDIUM",
+      "status": "PASSED"
+    },
+    {
+      "check": "Path Traversal Sanitization",
+      "result": "Relative ../ paths stripped from storage keys",
+      "severity": "HIGH",
+      "status": "PASSED"
+    },
+    {
+      "check": "XSS Sanitization in Metadata Display",
+      "result": "HTML entities escaped in React virtual DOM",
+      "severity": "HIGH",
+      "status": "PASSED"
+    },
+    {
+      "check": "Deterministic SHA-256 Hex Validation",
+      "result": "Strict 64-character lowercase hex regex enforced",
+      "severity": "MEDIUM",
+      "status": "PASSED"
+    },
+    {
+      "check": "HTTPS / TLS Transport Expectation",
+      "result": "Secure WebSocket & HTTPS endpoints configured",
+      "severity": "HIGH",
+      "status": "PASSED"
+    },
+    {
+      "check": "Session Token Expiry & Automatic Refresh",
+      "result": "Supabase autoRefreshToken enabled",
+      "severity": "MEDIUM",
+      "status": "PASSED"
+    }
+  ]
+}

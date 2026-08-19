@@ -1,0 +1,169 @@
+name: TrustLink Web CI/CD & Automated Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  setup-node:
+    name: setup-node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: TypeScript Typecheck & Build Web App
+        run: npm run build
+
+      - name: Upload Web Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist/
+
+  selenium-tests:
+    name: selenium-tests
+    needs: setup-node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Selenium Web E2E Tests
+        run: node scripts/selenium-test.js
+
+      - name: Upload Selenium Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-report
+          path: reports/selenium-report.json
+
+  appium-tests:
+    name: appium-tests
+    needs: setup-node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Appium Mobile Responsive Tests
+        run: node scripts/appium-test.js
+
+      - name: Upload Appium Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-report
+          path: reports/appium-report.json
+
+  load-tests:
+    name: load-tests
+    needs: setup-node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Load Time & Performance Benchmarks
+        run: node scripts/load-test.js
+
+      - name: Upload Load Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-report
+          path: reports/load-report.json
+
+  security-assessment:
+    name: security-assessment
+    needs: setup-node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Security & Vulnerability Assessment
+        run: node scripts/security-audit.js
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: reports/security-report.json
+
+  summary:
+    name: summary
+    needs: [selenium-tests, appium-tests, load-tests, security-assessment]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Download All Report Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: reports/
+
+      - name: Generate Consolidated Summary Report
+        run: node scripts/generate-summary-report.js
+
+      - name: Upload Summary Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-report
+          path: reports/

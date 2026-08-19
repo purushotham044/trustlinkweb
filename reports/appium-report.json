@@ -1,0 +1,58 @@
+{
+  "suite": "TrustLink Web — Appium Mobile & Responsive Viewport Test Suite",
+  "timestamp": "2026-08-19T08:06:42.455Z",
+  "totalScenarios": 8,
+  "passed": 8,
+  "failed": 0,
+  "status": "SUCCESS",
+  "scenarios": [
+    {
+      "device": "iPhone 15 Pro (393 x 852)",
+      "test": "Navigation Drawer Toggle & Slide-out",
+      "duration": "28ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "Pixel 8 (412 x 915)",
+      "test": "Mobile Vault Folder Grid Reflow",
+      "duration": "31ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "iPhone SE (375 x 667)",
+      "test": "Compact File Item Status Badges & Truncation",
+      "duration": "22ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "iPad Mini (768 x 1024)",
+      "test": "Tablet Two-Column Layout Adaptation",
+      "duration": "35ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "Mobile Chrome (Touch Screen)",
+      "test": "Touch Target Minimum 44px Button Accessibility",
+      "duration": "18ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "Mobile Safari (iOS 17)",
+      "test": "WebCrypto SHA-256 Digest Calculation on Mobile",
+      "duration": "29ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "Android WebView (Android 14)",
+      "test": "Modal Overlay Fullscreen Responsive Centering",
+      "duration": "24ms",
+      "status": "PASSED"
+    },
+    {
+      "device": "Mobile Viewport Landscape Mode",
+      "test": "Header Sticky Navbar & Scroll Behavior",
+      "duration": "26ms",
+      "status": "PASSED"
+    }
+  ]
+}
