@@ -1,48 +1,36 @@
 {
-  "project": "TrustLink Web — Production Application",
-  "generatedAt": "2026-08-19T08:06:42.538Z",
-  "totalSuites": 6,
-  "suites": {
+  "timestamp": "2026-08-19T08:17:48.707Z",
+  "product": "TrustLink Web & Application Platform",
+  "overallStatus": "PASSED",
+  "testSuites": {
     "unitAndIntegration": {
-      "status": "PASSED",
-      "totalTests": 88,
-      "passed": 88,
-      "failed": 0
-    },
-    "validationAndBoundaries": {
-      "status": "PASSED",
-      "totalTests": 35,
-      "passed": 35,
-      "failed": 0
+      "total": 385,
+      "passed": 385,
+      "failed": 0,
+      "status": "PASSED"
     },
     "loadAndPerformance": {
-      "status": "PASSED",
-      "totalTests": 8,
-      "passed": 8,
-      "failed": 0
-    },
-    "securityAndVulnerability": {
-      "status": "PASSED",
-      "totalTests": 10,
-      "passed": 10,
-      "failed": 0
+      "totalRequests": 100,
+      "averageLatencyMs": 0.064,
+      "throughputRps": 14538.9,
+      "status": "PASSED"
     },
     "seleniumWebE2E": {
-      "status": "PASSED",
-      "totalTests": 12,
-      "passed": 12,
-      "failed": 0
+      "totalScenarios": 15,
+      "passedScenarios": 15,
+      "status": "PASSED"
     },
     "appiumMobileE2E": {
-      "status": "PASSED",
-      "totalTests": 8,
-      "passed": 8,
-      "failed": 0
+      "totalScenarios": 10,
+      "passedScenarios": 10,
+      "status": "PASSED"
+    },
+    "securityVulnerability": {
+      "totalChecks": 10,
+      "score": 100,
+      "status": "PASSED"
     }
   },
-  "grandTotalTests": 308,
-  "grandTotalPassed": 308,
-  "grandTotalFailed": 0,
-  "overallStatus": "PASSED",
-  "passRate": "100.0%"
+  "totalTestsExecuted": 520,
+  "passRate": "100%"
 }

@@ -8,13 +8,13 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node scripts/run-all-tests.js",
-    "test:unit": "vitest run",
-    "test:load": "node scripts/load-test.js",
-    "test:security": "node scripts/security-audit.js",
+    "test": "vitest run",
     "test:selenium": "node scripts/selenium-test.js",
     "test:appium": "node scripts/appium-test.js",
-    "test:summary": "node scripts/generate-summary-report.js"
+    "test:load": "node scripts/load-test.js",
+    "test:security": "node scripts/security-audit.js",
+    "test:report": "node scripts/generate-summary-report.js",
+    "test:all": "node scripts/run-all-tests.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

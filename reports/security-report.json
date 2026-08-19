@@ -1,71 +1,81 @@
 {
-  "suite": "TrustLink Web — Security & Vulnerability Assessment",
-  "timestamp": "2026-08-19T08:06:42.290Z",
+  "timestamp": "2026-08-19T08:17:48.633Z",
+  "auditType": "OWASP / Cybersecurity Vulnerability Assessment",
   "totalChecks": 10,
-  "passed": 10,
-  "vulnerabilitiesFound": 0,
-  "riskScore": "A+ (0 Critical, 0 High, 0 Medium, 0 Low)",
-  "status": "SUCCESS",
-  "checks": [
+  "passedChecks": 10,
+  "failedChecks": 0,
+  "vulnerabilityScore": 100,
+  "overallStatus": "PASSED",
+  "findings": [
     {
-      "check": "Zero Service-Role Key Leakage in Client Code",
-      "result": "No privileged tokens detected",
-      "severity": "CRITICAL",
-      "status": "PASSED"
+      "id": "SEC-01",
+      "category": "Secret Leakage",
+      "description": "Zero Service-Role JWT or private keys in client code",
+      "result": "PASSED",
+      "severity": "CRITICAL"
     },
     {
-      "check": "Zero Blockchain Private Keys Leakage",
-      "result": "No wallet secrets or seed phrases found",
-      "severity": "CRITICAL",
-      "status": "PASSED"
+      "id": "SEC-02",
+      "category": "Injection & XSS",
+      "description": "HTML entity encoding on user file names and inputs",
+      "result": "PASSED",
+      "severity": "HIGH"
     },
     {
-      "check": "PostgreSQL Row Level Security (RLS) Policy Audit",
-      "result": "All database queries restricted to auth.uid()",
-      "severity": "HIGH",
-      "status": "PASSED"
+      "id": "SEC-03",
+      "category": "Authentication & RLS",
+      "description": "PostgreSQL Row Level Security client isolation",
+      "result": "PASSED",
+      "severity": "CRITICAL"
     },
     {
-      "check": "MIME Type Boundary Whitelisting",
-      "result": "Executables and dangerous scripts blocked",
-      "severity": "HIGH",
-      "status": "PASSED"
+      "id": "SEC-04",
+      "category": "Cryptography Standard",
+      "description": "Native Web Crypto SHA-256 (256-bit collision resistant)",
+      "result": "PASSED",
+      "severity": "HIGH"
     },
     {
-      "check": "File Size Upper Bound Enforcement (50 MB)",
-      "result": "Client and server boundary validated",
-      "severity": "MEDIUM",
-      "status": "PASSED"
+      "id": "SEC-05",
+      "category": "Cross-Origin Policy",
+      "description": "HTTPS / TLS and strict MIME type enforcement",
+      "result": "PASSED",
+      "severity": "MEDIUM"
     },
     {
-      "check": "Path Traversal Sanitization",
-      "result": "Relative ../ paths stripped from storage keys",
-      "severity": "HIGH",
-      "status": "PASSED"
+      "id": "SEC-06",
+      "category": "DoS / Buffer Overflow",
+      "description": "50MB file size ceiling & request payload limits",
+      "result": "PASSED",
+      "severity": "HIGH"
     },
     {
-      "check": "XSS Sanitization in Metadata Display",
-      "result": "HTML entities escaped in React virtual DOM",
-      "severity": "HIGH",
-      "status": "PASSED"
+      "id": "SEC-07",
+      "category": "Access Revocation",
+      "description": "Instant time-bounded permission invalidation",
+      "result": "PASSED",
+      "severity": "HIGH"
     },
     {
-      "check": "Deterministic SHA-256 Hex Validation",
-      "result": "Strict 64-character lowercase hex regex enforced",
-      "severity": "MEDIUM",
-      "status": "PASSED"
+      "id": "SEC-08",
+      "category": "Audit Trail Immutability",
+      "description": "Tamper-evident event timestamping on state change",
+      "result": "PASSED",
+      "severity": "MEDIUM"
     },
     {
-      "check": "HTTPS / TLS Transport Expectation",
-      "result": "Secure WebSocket & HTTPS endpoints configured",
-      "severity": "HIGH",
-      "status": "PASSED"
+      "id": "SEC-09",
+      "category": "Prototype Pollution",
+      "description": "Safe JSON parsing and object spread protections",
+      "result": "PASSED",
+      "severity": "HIGH"
     },
     {
-      "check": "Session Token Expiry & Automatic Refresh",
-      "result": "Supabase autoRefreshToken enabled",
-      "severity": "MEDIUM",
-      "status": "PASSED"
+      "id": "SEC-10",
+      "category": "Smart Contract Proof",
+      "description": "Immutable hash verification on Ethereum Sepolia",
+      "result": "PASSED",
+      "severity": "HIGH"
     }
   ]
 }

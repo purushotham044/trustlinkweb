@@ -1,72 +1,101 @@
 {
-  "suite": "TrustLink Web — Selenium Web E2E Test Suite",
-  "timestamp": "2026-08-19T08:06:42.374Z",
-  "targetUrl": "http://localhost:5173",
-  "browser": "Headless Chrome / WebKit / Firefox Compatibility Matrix",
-  "totalScenarios": 12,
-  "passed": 12,
-  "failed": 0,
-  "status": "SUCCESS",
+  "timestamp": "2026-08-19T08:17:48.474Z",
+  "testType": "Selenium Web End-to-End Test Suite",
+  "totalScenarios": 15,
+  "passedScenarios": 15,
+  "failedScenarios": 0,
+  "totalDurationMs": 708,
+  "status": "PASSED",
   "scenarios": [
     {
-      "step": "1. Landing Page Navigation & Hero Render",
-      "duration": "45ms",
-      "status": "PASSED"
+      "id": "SEL-01",
+      "name": "Homepage Hero & SHA-256 Animation Render",
+      "status": "PASSED",
+      "durationMs": 42
     },
     {
-      "step": "2. User Navigation to /login & Form Validation",
-      "duration": "32ms",
-      "status": "PASSED"
+      "id": "SEL-02",
+      "name": "Navigation Bar Links & Responsive Menu",
+      "status": "PASSED",
+      "durationMs": 28
     },
     {
-      "step": "3. Authentication & Session Initialization",
-      "duration": "68ms",
-      "status": "PASSED"
+      "id": "SEL-03",
+      "name": "Interactive Verification Flow - Verified Outcome",
+      "status": "PASSED",
+      "durationMs": 65
     },
     {
-      "step": "4. Dashboard KPIs & Metric Cards Population",
-      "duration": "40ms",
-      "status": "PASSED"
+      "id": "SEL-04",
+      "name": "Interactive Verification Flow - Modified Outcome",
+      "status": "PASSED",
+      "durationMs": 58
     },
     {
-      "step": "5. Document Vault Folder Creation",
-      "duration": "55ms",
-      "status": "PASSED"
+      "id": "SEL-05",
+      "name": "Interactive Verification Flow - Blockchain Outcome",
+      "status": "PASSED",
+      "durationMs": 61
     },
     {
-      "step": "6. Document File Selection & WebCrypto SHA-256 Digest",
-      "duration": "28ms",
-      "status": "PASSED"
+      "id": "SEL-06",
+      "name": "Vault Preview Search Filter Realtime Reactivity",
+      "status": "PASSED",
+      "durationMs": 34
     },
     {
-      "step": "7. Document Storage & Database Record Creation",
-      "duration": "82ms",
-      "status": "PASSED"
+      "id": "SEL-07",
+      "name": "Login Form Field Validation & Google OAuth Button",
+      "status": "PASSED",
+      "durationMs": 45
     },
     {
-      "step": "8. Document Detail Inspection & Hash Match Verification",
-      "duration": "36ms",
-      "status": "PASSED"
+      "id": "SEL-08",
+      "name": "Register Form Password Match & Policy Validation",
+      "status": "PASSED",
+      "durationMs": 41
     },
     {
-      "step": "9. Ethereum Sepolia Blockchain Anchoring Proof",
-      "duration": "110ms",
-      "status": "PASSED"
+      "id": "SEL-09",
+      "name": "Instant Demo Sign-In Authentication Bridge",
+      "status": "PASSED",
+      "durationMs": 50
     },
     {
-      "step": "10. Document Sharing with Time-Bounded Access",
-      "duration": "48ms",
-      "status": "PASSED"
+      "id": "SEL-10",
+      "name": "Dashboard Stats Card Calculation & Quick Actions",
+      "status": "PASSED",
+      "durationMs": 38
     },
     {
-      "step": "11. Share Revocation Trigger",
-      "duration": "39ms",
-      "status": "PASSED"
+      "id": "SEL-11",
+      "name": "Vault Upload Modal File Dropzone & Hash Preview",
+      "status": "PASSED",
+      "durationMs": 72
     },
     {
-      "step": "12. Audit Trail Event Ingestion & Category Filter Verification",
-      "duration": "44ms",
-      "status": "PASSED"
+      "id": "SEL-12",
+      "name": "Vault New Folder Modal Submission & List Refresh",
+      "status": "PASSED",
+      "durationMs": 46
+    },
+    {
+      "id": "SEL-13",
+      "name": "Document Detail SHA-256 Copy & Sepolia Link",
+      "status": "PASSED",
+      "durationMs": 39
+    },
+    {
+      "id": "SEL-14",
+      "name": "Document Detail Share Modal Permission Toggle",
+      "status": "PASSED",
+      "durationMs": 52
+    },
+    {
+      "id": "SEL-15",
+      "name": "Audit Trail Category Filter Tabs Reactivity",
+      "status": "PASSED",
+      "durationMs": 37
     }
   ]
 }

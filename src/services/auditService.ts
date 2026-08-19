@@ -1,5 +1,5 @@
 // ============================================================
-// TrustLink Web — Audit Service with Demo Fallback & Category Filter
+// TrustLink Web — Audit Service with Demo Fallback
 // ============================================================
 
 import { supabase } from '@/lib/supabase';
@@ -85,20 +85,10 @@ export const auditService = {
   },
 
   async getAuditLogs(category: AuditCategory = 'ALL'): Promise<ExtendedAuditLog[]> {
-    const actionsMap: Record<AuditCategory, AuditAction[] | null> = {
-      ALL: null,
-      BLOCKCHAIN: ['BLOCKCHAIN_ANCHORED', 'BLOCKCHAIN_ANCHOR_FAILED'],
-      INTEGRITY: ['HASH_CREATED', 'DOCUMENT_VERIFIED'],
-      SHARING: ['DOCUMENT_SHARED', 'SHARE_REVOKED'],
-      FILES: ['DOCUMENT_UPLOADED', 'DOCUMENT_VIEWED', 'DOCUMENT_DOWNLOADED', 'DOCUMENT_RENAMED', 'DOCUMENT_MOVED', 'DOCUMENT_DELETED'],
-    };
-
-    const targetActions = actionsMap[category];
-
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        return targetActions ? DEMO_LOGS.filter(l => targetActions.includes(l.action)) : DEMO_LOGS;
+        return DEMO_LOGS;
       }
 
       let query = supabase
@@ -107,17 +97,26 @@ export const auditService = {
         .eq('user_id', userData.user.id)
         .order('created_at', { ascending: false });
 
+      const actionsMap: Record<AuditCategory, AuditAction[] | null> = {
+        ALL: null,
+        BLOCKCHAIN: ['BLOCKCHAIN_ANCHORED', 'BLOCKCHAIN_ANCHOR_FAILED'],
+        INTEGRITY: ['HASH_CREATED', 'DOCUMENT_VERIFIED'],
+        SHARING: ['DOCUMENT_SHARED', 'SHARE_REVOKED'],
+        FILES: ['DOCUMENT_UPLOADED', 'DOCUMENT_VIEWED', 'DOCUMENT_DOWNLOADED', 'DOCUMENT_RENAMED', 'DOCUMENT_MOVED', 'DOCUMENT_DELETED'],
+      };
+
+      const targetActions = actionsMap[category];
       if (targetActions) {
         query = query.in('action', targetActions);
       }
 
       const { data, error } = await query;
       if (error || !data || data.length === 0) {
-        return targetActions ? DEMO_LOGS.filter(l => targetActions.includes(l.action)) : DEMO_LOGS;
+        return DEMO_LOGS;
       }
       return data as ExtendedAuditLog[];
     } catch {
-      return targetActions ? DEMO_LOGS.filter(l => targetActions.includes(l.action)) : DEMO_LOGS;
+      return DEMO_LOGS;
     }
   },
 };

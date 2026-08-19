@@ -1,45 +1,28 @@
-import { execSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { execSync } from 'child_process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.join(__dirname, '..');
-
-console.log('============================================================');
-console.log('🧪 TrustLink Web — Full Enterprise Test & Security Suite');
-console.log('============================================================\n');
+console.log('\n🚀 Starting TrustLink Full Automated Quality & Test Suite...\n');
 
 try {
-  console.log('👉 Step 1: Running Vitest Unit, Validation & Security Suites...');
-  execSync('npx vitest run', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('--- Phase 1: Vitest Unit & Integration Suites (385 tests) ---');
+  execSync('npm run test', { stdio: 'inherit' });
 
-  console.log('👉 Step 2: Running Load Time & Performance Benchmark Suite...');
-  execSync('node scripts/load-test.js', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('\n--- Phase 2: Real-time Load & Performance Benchmark ---');
+  execSync('node scripts/load-test.js', { stdio: 'inherit' });
 
-  console.log('👉 Step 3: Running Security & Vulnerability Assessment...');
-  execSync('node scripts/security-audit.js', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('--- Phase 3: Selenium Web E2E Verification ---');
+  execSync('node scripts/selenium-test.js', { stdio: 'inherit' });
 
-  console.log('👉 Step 4: Running Selenium Web E2E Test Suite...');
-  execSync('node scripts/selenium-test.js', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('--- Phase 4: Appium Mobile E2E Verification ---');
+  execSync('node scripts/appium-test.js', { stdio: 'inherit' });
 
-  console.log('👉 Step 5: Running Appium Mobile Viewport Test Suite...');
-  execSync('node scripts/appium-test.js', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('--- Phase 5: Security & OWASP Assessment ---');
+  execSync('node scripts/security-audit.js', { stdio: 'inherit' });
 
-  console.log('👉 Step 6: Generating Consolidated Summary Reports...');
-  execSync('node scripts/generate-summary-report.js', { cwd: rootDir, stdio: 'inherit' });
-  console.log('\n');
+  console.log('--- Phase 6: Compile Summary Report & Metrics ---');
+  execSync('node scripts/generate-summary-report.js', { stdio: 'inherit' });
 
-  console.log('============================================================');
-  console.log('🎉 ALL 300+ TEST CASES & SUITES PASSED SUCCESSFULLY!');
-  console.log('📄 Reports available in: D:\\PDD\\trustlinkweb\\reports\\');
-  console.log('============================================================');
+  console.log('🎉 ALL TEST PHASES COMPLETED WITH 100% PASS RATE!\n');
 } catch (error) {
-  console.error('\n❌ Test Execution Failed:', error.message);
+  console.error('❌ Test execution failed:', error.message);
   process.exit(1);
 }

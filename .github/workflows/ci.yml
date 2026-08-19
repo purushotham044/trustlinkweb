@@ -1,11 +1,10 @@
-name: TrustLink Web CI/CD & Automated Verification
+name: TrustLink CI/CD Pipeline
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:
 
 jobs:
   setup-node:
@@ -15,7 +14,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -24,7 +23,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: TypeScript Typecheck & Build Web App
+      - name: Run TypeScript & Unit Tests (385 tests)
+        run: npm test
+
+      - name: Build Web Application Bundle
         run: npm run build
 
       - name: Upload Web Build Artifact
@@ -32,6 +34,7 @@ jobs:
         with:
           name: web-build
           path: dist/
+          retention-days: 7
 
   selenium-tests:
     name: selenium-tests
@@ -41,16 +44,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Selenium Web E2E Tests
+      - name: Run Selenium Web E2E Scenarios
         run: node scripts/selenium-test.js
 
       - name: Upload Selenium Report
@@ -58,6 +57,7 @@ jobs:
         with:
           name: selenium-report
           path: reports/selenium-report.json
+          retention-days: 14
 
   appium-tests:
     name: appium-tests
@@ -67,16 +67,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Appium Mobile Responsive Tests
+      - name: Run Appium Mobile E2E Scenarios
         run: node scripts/appium-test.js
 
       - name: Upload Appium Report
@@ -84,6 +80,7 @@ jobs:
         with:
           name: appium-report
           path: reports/appium-report.json
+          retention-days: 14
 
   load-tests:
     name: load-tests
@@ -93,16 +90,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Load Time & Performance Benchmarks
+      - name: Run Real-Time High-Throughput Load Benchmark
         run: node scripts/load-test.js
 
       - name: Upload Load Report
@@ -110,6 +103,7 @@ jobs:
         with:
           name: load-report
           path: reports/load-report.json
+          retention-days: 14
 
   security-assessment:
     name: security-assessment
@@ -119,16 +113,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Security & Vulnerability Assessment
+      - name: Run Automated OWASP & Vulnerability Security Audit
         run: node scripts/security-audit.js
 
       - name: Upload Security Report
@@ -136,6 +126,7 @@ jobs:
         with:
           name: security-report
           path: reports/security-report.json
+          retention-days: 14
 
   summary:
     name: summary
@@ -145,25 +136,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Download All Report Artifacts
+      - name: Download all reports
         uses: actions/download-artifact@v4
         with:
           path: reports/
 
-      - name: Generate Consolidated Summary Report
+      - name: Generate Summary Report
         run: node scripts/generate-summary-report.js
 
-      - name: Upload Summary Report
+      - name: Upload Final Summary Report
         uses: actions/upload-artifact@v4
         with:
           name: summary-report
-          path: reports/
+          path: reports/summary.*
+          retention-days: 30

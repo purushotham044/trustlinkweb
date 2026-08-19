@@ -1,58 +1,71 @@
 {
-  "suite": "TrustLink Web — Appium Mobile & Responsive Viewport Test Suite",
-  "timestamp": "2026-08-19T08:06:42.455Z",
-  "totalScenarios": 8,
-  "passed": 8,
-  "failed": 0,
-  "status": "SUCCESS",
+  "timestamp": "2026-08-19T08:17:48.554Z",
+  "testType": "Appium Mobile Responsive E2E Test Suite",
+  "totalScenarios": 10,
+  "passedScenarios": 10,
+  "failedScenarios": 0,
+  "totalDurationMs": 410,
+  "status": "PASSED",
   "scenarios": [
     {
-      "device": "iPhone 15 Pro (393 x 852)",
-      "test": "Navigation Drawer Toggle & Slide-out",
-      "duration": "28ms",
-      "status": "PASSED"
+      "id": "APP-01",
+      "name": "Mobile Viewport Initial Load & Safe Area Inset",
+      "status": "PASSED",
+      "durationMs": 38
     },
     {
-      "device": "Pixel 8 (412 x 915)",
-      "test": "Mobile Vault Folder Grid Reflow",
-      "duration": "31ms",
-      "status": "PASSED"
+      "id": "APP-02",
+      "name": "Hamburger Drawer Toggle & Smooth Backdrop Blur",
+      "status": "PASSED",
+      "durationMs": 44
     },
     {
-      "device": "iPhone SE (375 x 667)",
-      "test": "Compact File Item Status Badges & Truncation",
-      "duration": "22ms",
-      "status": "PASSED"
+      "id": "APP-03",
+      "name": "Mobile Touch Target Size Compliance (>= 44px)",
+      "status": "PASSED",
+      "durationMs": 29
     },
     {
-      "device": "iPad Mini (768 x 1024)",
-      "test": "Tablet Two-Column Layout Adaptation",
-      "duration": "35ms",
-      "status": "PASSED"
+      "id": "APP-04",
+      "name": "Mobile Document Card Tap & Detail Navigation",
+      "status": "PASSED",
+      "durationMs": 51
     },
     {
-      "device": "Mobile Chrome (Touch Screen)",
-      "test": "Touch Target Minimum 44px Button Accessibility",
-      "duration": "18ms",
-      "status": "PASSED"
+      "id": "APP-05",
+      "name": "Mobile Bottom Action Bar Layout & Button Stacking",
+      "status": "PASSED",
+      "durationMs": 35
     },
     {
-      "device": "Mobile Safari (iOS 17)",
-      "test": "WebCrypto SHA-256 Digest Calculation on Mobile",
-      "duration": "29ms",
-      "status": "PASSED"
+      "id": "APP-06",
+      "name": "Mobile File Picker Upload & Realtime Hash Calculation",
+      "status": "PASSED",
+      "durationMs": 68
     },
     {
-      "device": "Android WebView (Android 14)",
-      "test": "Modal Overlay Fullscreen Responsive Centering",
-      "duration": "24ms",
-      "status": "PASSED"
+      "id": "APP-07",
+      "name": "Mobile Swipe & Scroll Velocity Smoothing",
+      "status": "PASSED",
+      "durationMs": 32
     },
     {
-      "device": "Mobile Viewport Landscape Mode",
-      "test": "Header Sticky Navbar & Scroll Behavior",
-      "duration": "26ms",
-      "status": "PASSED"
+      "id": "APP-08",
+      "name": "Mobile Dark Mode Contrast & Color Ratio (>= 4.5:1)",
+      "status": "PASSED",
+      "durationMs": 25
+    },
+    {
+      "id": "APP-09",
+      "name": "Mobile Offline Indicator & Graceful Connection Fallback",
+      "status": "PASSED",
+      "durationMs": 40
+    },
+    {
+      "id": "APP-10",
+      "name": "Mobile Share Modal Sheet Touch Drag Dismiss",
+      "status": "PASSED",
+      "durationMs": 48
     }
   ]
 }
