@@ -1,9 +1,8 @@
 // ============================================================
-// TrustLink Web — Document Detail & Blockchain Proof View
-// Complete feature parity with mobile app
+// TrustLink Web — Document Detail, Blockchain Proof & Live Tamper Tester
 // ============================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -24,12 +23,14 @@ import {
   Layers,
   Sparkles,
   RefreshCw,
-  Send
+  Send,
+  Upload,
+  FileCheck,
+  FileX
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { HashDisplay } from '@/components/ui/HashDisplay';
 import { supabase } from '@/lib/supabase';
 import { documentService } from '@/services/documentService';
 import { integrityService } from '@/services/integrityService';
@@ -37,7 +38,7 @@ import { blockchainService } from '@/services/blockchainService';
 import { shareService } from '@/services/shareService';
 import { Document, BlockchainProof, SharePermission } from '@/types';
 import { BLOCKCHAIN_EXPLORER_BASE, CONTRACT_EXPLORER_BASE, CONTRACT_ADDRESS } from '@/lib/constants';
-import { truncateHash, truncateTxHash } from '@/lib/crypto';
+import { truncateHash, truncateTxHash, computeFileSha256 } from '@/lib/crypto';
 
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +52,15 @@ export function DocumentDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [verificationFeedback, setVerificationFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Local Tamper-Test file checker state
+  const testFileInputRef = useRef<HTMLInputElement>(null);
+  const [testResult, setTestResult] = useState<{
+    testedFileName: string;
+    testedHash: string;
+    matches: boolean;
+  } | null>(null);
+  const [isTestingFile, setIsTestingFile] = useState(false);
 
   // Share Modal State
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -129,6 +139,30 @@ export function DocumentDetailPage() {
       });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleTestFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !doc) return;
+
+    setIsTestingFile(true);
+    setTestResult(null);
+
+    try {
+      const hash = await computeFileSha256(file);
+      const expectedHash = (doc.current_hash || '').toLowerCase();
+      const matches = hash.toLowerCase() === expectedHash;
+
+      setTestResult({
+        testedFileName: file.name,
+        testedHash: hash,
+        matches,
+      });
+    } catch (err: any) {
+      alert('Failed to hash test file: ' + err.message);
+    } finally {
+      setIsTestingFile(false);
     }
   };
 
@@ -244,6 +278,14 @@ export function DocumentDetailPage() {
 
   return (
     <AppLayout>
+      {/* Hidden File Input for Tamper Testing */}
+      <input
+        ref={testFileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleTestFileChosen}
+      />
+
       <div className="space-y-6 max-w-4xl mx-auto">
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between">
@@ -270,7 +312,7 @@ export function DocumentDetailPage() {
               className="gap-1.5 text-xs py-1.5"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Grant In-App Access</span>
+              <span>Grant Access</span>
             </Button>
             <Button
               variant="secondary"
@@ -456,6 +498,74 @@ export function DocumentDetailPage() {
           )}
         </div>
 
+        {/* Interactive Live File Tamper-Tester */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Search for Tamper
+              </h2>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Want to test if a file has been modified? Select any local file from your disk to compare its calculated cryptographic hash directly against this vault record and Sepolia blockchain proof.
+          </p>
+
+          <Button
+            variant="secondary"
+            onClick={() => testFileInputRef.current?.click()}
+            disabled={isTestingFile}
+            className="text-xs gap-1.5 py-2"
+          >
+            <Upload className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{isTestingFile ? 'Calculating Hash...' : 'Pick Local File to Compare'}</span>
+          </Button>
+
+          {/* Test Comparison Result */}
+          {testResult && (
+            <div
+              className={`p-4 rounded-xl border text-xs space-y-2.5 animate-in fade-in duration-200 ${
+                testResult.matches
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300'
+                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold text-sm">
+                {testResult.matches ? (
+                  <>
+                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                    <span>✓ MATCH CONFIRMED: File is 100% Authentic</span>
+                  </>
+                ) : (
+                  <>
+                    <FileX className="w-5 h-5 text-rose-600" />
+                    <span>⚠ FINGERPRINT MISMATCH: File Has Been Altered / Modified!</span>
+                  </>
+                )}
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <p>
+                  <span className="font-semibold">Selected File:</span> {testResult.testedFileName}
+                </p>
+                <div className="p-2 rounded-lg bg-black/20 font-mono text-[11px] break-all select-all">
+                  Calculated Hash: {testResult.testedHash}
+                </div>
+                <div className="p-2 rounded-lg bg-black/20 font-mono text-[11px] break-all select-all">
+                  Vault Reference: {doc.current_hash}
+                </div>
+              </div>
+
+              <p className="text-[11px] italic">
+                {testResult.matches
+                  ? 'The local file bytes match the Sepolia-anchored SHA-256 fingerprint down to the exact bit.'
+                  : 'The local file bytes do not match the registered record. Even 1 modified letter or pixel breaks the signature.'}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Primary Verification Action */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Button
@@ -465,7 +575,7 @@ export function DocumentDetailPage() {
             className="flex-1 py-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold shadow-md"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>{verifying ? 'Re-Computing Cryptographic Signature...' : 'Verify Cryptographic Integrity'}</span>
+            <span>{verifying ? 'Re-Computing Cryptographic Signature...' : 'Verify Cloud Vault Binary'}</span>
           </Button>
         </div>
 

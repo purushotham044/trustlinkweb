@@ -1,64 +1,49 @@
 import React from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'blockchain';
-type Size = 'sm' | 'md' | 'lg';
-
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'blockchain';
+  size?: 'sm' | 'md' | 'lg';
+  icon?: React.ReactNode;
   loading?: boolean;
   fullWidth?: boolean;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
 }
 
-const variantStyles: Record<Variant, string> = {
-  primary: 'bg-[#00D4FF] text-[#0A0E1A] border-[#00D4FF] hover:bg-[#0099BB] hover:border-[#0099BB] font-semibold',
-  secondary: 'bg-transparent text-[#00D4FF] border-[#00D4FF] hover:bg-[rgba(0,212,255,0.1)]',
-  ghost: 'bg-transparent text-[#94A3B8] border-[#1E293B] hover:border-[#2D3748] hover:text-[#F1F5F9]',
-  danger: 'bg-[rgba(239,68,68,0.12)] text-[#EF4444] border-[#EF4444] hover:bg-[rgba(239,68,68,0.2)]',
-  blockchain: 'bg-[rgba(139,92,246,0.12)] text-[#8B5CF6] border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.2)]',
-};
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className = '', variant = 'primary', size = 'md', icon, loading, fullWidth, children, disabled, ...props }, ref) => {
+    const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
-const sizeStyles: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-xs gap-1.5',
-  md: 'px-5 py-2.5 text-sm gap-2',
-  lg: 'px-7 py-3.5 text-base gap-2.5',
-};
+    const sizeStyles = {
+      sm: 'px-3 py-1.5 text-xs gap-1.5',
+      md: 'px-4 py-2 text-sm gap-2',
+      lg: 'px-6 py-3 text-base gap-2.5',
+    };
 
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  fullWidth = false,
-  icon,
-  children,
-  className = '',
-  disabled,
-  ...props
-}: ButtonProps) {
-  const isDisabled = disabled || loading;
-  return (
-    <button
-      disabled={isDisabled}
-      className={[
-        'inline-flex items-center justify-center rounded-[10px] border transition-all duration-200 select-none cursor-pointer',
-        variantStyles[variant],
-        sizeStyles[size],
-        fullWidth ? 'w-full' : '',
-        isDisabled ? 'opacity-45 cursor-not-allowed' : '',
-        className,
-      ].join(' ')}
-      {...props}
-    >
-      {loading ? (
-        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-      ) : (
-        <>
-          {icon && <span className="shrink-0">{icon}</span>}
-          {children}
-        </>
-      )}
-    </button>
-  );
-}
+    const variantStyles = {
+      primary: 'bg-[#00D4FF] hover:bg-[#00B4D8] text-[#0A0E1A] font-bold shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:shadow-[0_0_25px_rgba(0,212,255,0.35)] focus:ring-[#00D4FF]',
+      secondary: 'bg-[#111827] hover:bg-[#1A2235] text-[#F1F5F9] border border-[#1E293B] hover:border-[#2D3748] focus:ring-[#475569]',
+      danger: 'bg-[rgba(239,68,68,0.1)] hover:bg-[rgba(239,68,68,0.2)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] focus:ring-[#EF4444]',
+      ghost: 'bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#94A3B8] hover:text-[#F1F5F9] focus:ring-[#475569]',
+      blockchain: 'bg-[rgba(139,92,246,0.12)] hover:bg-[rgba(139,92,246,0.2)] text-[#A78BFA] border border-[rgba(139,92,246,0.3)] focus:ring-[#8B5CF6]',
+    };
+
+    const widthStyle = fullWidth ? 'w-full' : '';
+
+    return (
+      <button
+        ref={ref}
+        disabled={disabled || loading}
+        className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${widthStyle} ${className}`}
+        {...props}
+      >
+        {loading ? (
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          icon
+        )}
+        {children}
+      </button>
+    );
+  }
+);
+
+Button.displayName = 'Button';

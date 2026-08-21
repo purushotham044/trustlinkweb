@@ -50,6 +50,9 @@ export function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
+          {/* Root App Redirect */}
+          <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
+
           {/* Authenticated Application Routes */}
           <Route
             path="/app/dashboard"
@@ -64,6 +67,15 @@ export function App() {
             element={
               <PrivateRoute>
                 <VaultPage />
+              </PrivateRoute>
+            }
+          />
+          {/* Support both /app/documents/:id and /app/vault/:id */}
+          <Route
+            path="/app/documents/:id"
+            element={
+              <PrivateRoute>
+                <DocumentDetailPage />
               </PrivateRoute>
             }
           />
@@ -101,7 +113,7 @@ export function App() {
           />
 
           {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
