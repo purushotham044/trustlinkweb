@@ -1,269 +1,227 @@
 // ============================================================
-// TrustLink Web — Document Service with Live Upload & Folder Creation
+// TrustLink Web — Document Service
+// Mirrors mobile app upload, download, and multi-table cascading delete
 // ============================================================
 
 import { supabase } from '@/lib/supabase';
+import { Document } from '@/types';
 import { computeFileSha256 } from '@/lib/crypto';
-import type { Document, Folder, DashboardStats } from '@/types';
-
-// In-memory demo state persistence so created folders and docs persist in session
-let demoFolders: Folder[] = [
-  { id: 'f-1', owner_id: 'demo-user-0000-0000-000000000001', name: 'Legal Agreements', parent_id: null, created_at: new Date().toISOString() },
-  { id: 'f-2', owner_id: 'demo-user-0000-0000-000000000001', name: 'Financial Audits', parent_id: null, created_at: new Date().toISOString() },
-  { id: 'f-3', owner_id: 'demo-user-0000-0000-000000000001', name: 'Compliance & KYC', parent_id: null, created_at: new Date().toISOString() },
-];
-
-let demoDocuments: Document[] = [
-  {
-    id: 'doc-1',
-    owner_id: 'demo-user-0000-0000-000000000001',
-    folder_id: 'f-1',
-    name: 'Master_Services_Agreement_2026.pdf',
-    mime_type: 'application/pdf',
-    size: 245760,
-    storage_path: 'legal/msa_2026.pdf',
-    current_hash: 'a3f8c2e91d47b65f0e8a2c3d4b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3',
-    integrity_status: 'VERIFIED',
-    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'doc-2',
-    owner_id: 'demo-user-0000-0000-000000000001',
-    folder_id: 'f-2',
-    name: 'Q3_Financial_Audit_Report.xlsx',
-    mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    size: 1258291,
-    storage_path: 'finance/q3_audit.xlsx',
-    current_hash: '7d4e1f2a9b8c3e0d5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8',
-    integrity_status: 'VERIFIED',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'doc-3',
-    owner_id: 'demo-user-0000-0000-000000000001',
-    folder_id: 'f-3',
-    name: 'Corporate_Identity_Verification.png',
-    mime_type: 'image/png',
-    size: 892400,
-    storage_path: 'identity/kyc_scan.png',
-    current_hash: 'e8a2c3d4b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3a3f8c2e91d47b65f0',
-    integrity_status: 'PENDING',
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
+import { integrityService } from './integrityService';
 
 export const documentService = {
+  /**
+   * Fetches documents in a specific folder (or root if null)
+   */
   async getDocuments(folderId: string | null = null): Promise<Document[]> {
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        return demoDocuments.filter(d => folderId ? d.folder_id === folderId : true);
-      }
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) throw new Error('Not authenticated');
 
-      let query = supabase
-        .from('documents')
-        .select('*')
-        .eq('owner_id', userData.user.id)
-        .order('created_at', { ascending: false });
+    let query = supabase
+      .from('documents')
+      .select('*')
+      .eq('owner_id', user.user.id)
+      .order('created_at', { ascending: false });
 
-      if (folderId === null) {
-        query = query.is('folder_id', null);
-      } else {
-        query = query.eq('folder_id', folderId);
-      }
-
-      const { data, error } = await query;
-      if (error || !data || data.length === 0) {
-        return demoDocuments.filter(d => folderId ? d.folder_id === folderId : true);
-      }
-      return data as Document[];
-    } catch {
-      return demoDocuments.filter(d => folderId ? d.folder_id === folderId : true);
+    if (folderId === null) {
+      query = query.is('folder_id', null);
+    } else {
+      query = query.eq('folder_id', folderId);
     }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    return (data || []) as Document[];
   },
 
-  async getDocumentById(id: string): Promise<Document | null> {
+  /**
+   * Uploads a file with live multi-step progress callbacks.
+   */
+  async uploadDocument(
+    file: File,
+    folderId: string | null = null,
+    onProgress?: (step: number, statusText: string) => void
+  ): Promise<Document> {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) throw new Error('Not authenticated. Please sign in again.');
+
+    if (file.size > 50 * 1024 * 1024) {
+      throw new Error('File size exceeds the 50MB limit.');
+    }
+
+    // 0. Profile sync
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', id)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.user.id)
         .maybeSingle();
-      if (!error && data) return data as Document;
-      return demoDocuments.find(d => d.id === id) || demoDocuments[0];
-    } catch {
-      return demoDocuments.find(d => d.id === id) || demoDocuments[0];
-    }
-  },
 
-  async getFolders(parentId: string | null = null): Promise<Folder[]> {
+      if (!profile) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: user.user.id,
+            full_name: user.user.user_metadata?.full_name || user.user.email?.split('@')[0] || 'User',
+          }, { onConflict: 'id' });
+      }
+    } catch (profileErr) {
+      console.warn('Profile sync note:', profileErr);
+    }
+
+    // Step 1: Compute SHA-256 fingerprint
+    onProgress?.(1, 'Computing cryptographic SHA-256 fingerprint...');
+    const sha256Hash = await computeFileSha256(file);
+
+    // Step 2: Storage Upload with isolated path
+    onProgress?.(2, 'Encrypting & uploading to vault storage...');
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const folderPrefix = folderId ? `folders/${folderId}/` : '';
+    const storagePath = `${user.user.id}/${folderPrefix}${Date.now()}_${safeFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(storagePath, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      throw new Error(`Storage error: ${uploadError.message || 'Could not save file to storage bucket.'}`);
+    }
+
+    // Step 3: Database Record & Ledger
+    onProgress?.(3, 'Recording verification entry in database...');
+    const { data, error: dbError } = await supabase
+      .from('documents')
+      .insert({
+        owner_id: user.user.id,
+        folder_id: folderId,
+        name: file.name,
+        storage_path: storagePath,
+        mime_type: file.type || 'application/octet-stream',
+        size: file.size,
+        current_hash: sha256Hash,
+        integrity_status: 'PENDING',
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      // Rollback storage if DB fails
+      await supabase.storage.from('documents').remove([storagePath]);
+      throw new Error(`Database error: ${dbError.message || 'Could not create document record.'}`);
+    }
+
+    // Create integrity record (resilient)
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        return demoFolders.filter(f => parentId ? f.parent_id === parentId : true);
-      }
-
-      let query = supabase
-        .from('folders')
-        .select('*')
-        .eq('owner_id', userData.user.id)
-        .order('name', { ascending: true });
-
-      if (parentId === null) {
-        query = query.is('parent_id', null);
-      } else {
-        query = query.eq('parent_id', parentId);
-      }
-
-      const { data, error } = await query;
-      if (error || !data || data.length === 0) {
-        return demoFolders.filter(f => parentId ? f.parent_id === parentId : true);
-      }
-      return data as Folder[];
-    } catch {
-      return demoFolders.filter(f => parentId ? f.parent_id === parentId : true);
+      await integrityService.createIntegrityRecord(data.id, sha256Hash, 1);
+    } catch (integrityErr: any) {
+      console.warn('Integrity ledger record note:', integrityErr.message);
     }
-  },
 
-  async createFolder(name: string, parentId: string | null = null): Promise<Folder> {
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error('Folder name cannot be empty');
-
+    // Log upload to audit trail (resilient)
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData.user) {
-        const { data, error } = await supabase
-          .from('folders')
-          .insert({
-            owner_id: userData.user.id,
-            name: trimmed,
-            parent_id: parentId,
-          })
-          .select()
-          .single();
-        if (!error && data) return data as Folder;
-      }
-    } catch (e) {
-      console.warn('Supabase createFolder fallback to local state:', e);
+      await supabase.from('audit_logs').insert({
+        user_id: user.user.id,
+        document_id: data.id,
+        action: 'DOCUMENT_UPLOADED',
+        metadata: { name: file.name, size: file.size, mime_type: file.type },
+      });
+    } catch (auditErr: any) {
+      console.warn('Audit log note:', auditErr.message);
     }
 
-    const newFolder: Folder = {
-      id: `f-${Date.now()}`,
-      owner_id: 'demo-user-0000-0000-000000000001',
-      name: trimmed,
-      parent_id: parentId,
-      created_at: new Date().toISOString(),
-    };
-    demoFolders = [newFolder, ...demoFolders];
-    return newFolder;
+    onProgress?.(4, 'Document secured and ready in your vault!');
+    return data as Document;
   },
 
-  async uploadDocument(file: File, folderId: string | null = null): Promise<Document> {
-    const hash = await computeFileSha256(file);
-    const fileName = file.name;
-    const size = file.size;
-    const mimeType = file.type || 'application/octet-stream';
-    const filePath = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  /**
+   * Generates a short-lived signed URL for downloading or viewing a document.
+   */
+  async getDownloadUrl(storagePath: string): Promise<string> {
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(storagePath, 60); // 60 seconds
 
+    if (error) throw error;
+    return data.signedUrl;
+  },
+
+  /**
+   * Downloads a document directly in the browser.
+   */
+  async downloadDocument(document: Document): Promise<void> {
+    const { data: user } = await supabase.auth.getUser();
+    const signedUrl = await this.getDownloadUrl(document.storage_path);
+
+    const a = window.document.createElement('a');
+    a.href = signedUrl;
+    a.download = document.name;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+
+    // Log download to audit trail
+    if (user?.user) {
+      try {
+        await supabase.from('audit_logs').insert({
+          user_id: user.user.id,
+          document_id: document.id,
+          action: 'DOCUMENT_DOWNLOADED',
+          metadata: { name: document.name },
+        });
+      } catch (e) {}
+    }
+  },
+
+  /**
+   * Deletes a document from Database (and child records) and Storage bucket.
+   */
+  async deleteDocument(document: Document): Promise<void> {
+    const { data: user } = await supabase.auth.getUser();
+
+    // 1. Clean up child records first to ensure no foreign key blockages
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData.user) {
-        // Upload to storage
-        const { error: storageError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file);
-        if (storageError) console.warn('Storage upload error:', storageError);
-
-        // Insert database row
-        const { data, error } = await supabase
-          .from('documents')
-          .insert({
-            owner_id: userData.user.id,
-            folder_id: folderId,
-            name: fileName,
-            mime_type: mimeType,
-            size,
-            storage_path: filePath,
-            current_hash: hash,
-            integrity_status: 'VERIFIED',
-          })
-          .select()
-          .single();
-
-        if (!error && data) {
-          // Log audit
-          await supabase.from('audit_logs').insert({
-            user_id: userData.user.id,
-            document_id: data.id,
-            action: 'DOCUMENT_UPLOADED',
-            metadata: { size, mime_type: mimeType, hash },
-          });
-          return data as Document;
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase upload fallback to local state:', e);
+      await supabase.from('document_integrity_records').delete().eq('document_id', document.id);
+      await supabase.from('blockchain_proofs').delete().eq('document_id', document.id);
+      await supabase.from('document_shares').delete().eq('document_id', document.id);
+      await supabase.from('audit_logs').update({ document_id: null }).eq('document_id', document.id);
+    } catch (cleanErr) {
+      console.warn('Pre-delete cleanup note:', cleanErr);
     }
 
-    const newDoc: Document = {
-      id: `doc-${Date.now()}`,
-      owner_id: 'demo-user-0000-0000-000000000001',
-      folder_id: folderId,
-      name: fileName,
-      mime_type: mimeType,
-      size,
-      storage_path: filePath,
-      current_hash: hash,
-      integrity_status: 'VERIFIED',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    demoDocuments = [newDoc, ...demoDocuments];
-    return newDoc;
-  },
+    // 2. Delete main document record
+    const { error: dbError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', document.id);
 
-  async getDashboardStats(): Promise<DashboardStats> {
+    if (dbError) {
+      console.error('Database delete error:', dbError);
+      throw new Error(`Database delete error: ${dbError.message || 'Could not delete document'}`);
+    }
+
+    // 3. Delete file from Storage bucket
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        return { totalDocs: demoDocuments.length, verifiedDocs: demoDocuments.filter(d => d.integrity_status === 'VERIFIED').length, anchoredDocs: 1, sharedDocs: 2 };
-      }
-
-      const uid = userData.user.id;
-
-      const [
-        { count: totalCount },
-        { count: verifiedCount },
-        { count: anchoredCount },
-        { count: sharedCount },
-      ] = await Promise.all([
-        supabase.from('documents').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
-        supabase.from('documents').select('*', { count: 'exact', head: true }).eq('owner_id', uid).eq('integrity_status', 'VERIFIED'),
-        supabase.from('blockchain_proofs').select('*, documents!inner(owner_id)', { count: 'exact', head: true }).eq('documents.owner_id', uid).eq('status', 'CONFIRMED'),
-        supabase.from('document_shares').select('*', { count: 'exact', head: true }).eq('owner_id', uid).is('revoked_at', null),
-      ]);
-
-      return {
-        totalDocs: totalCount || demoDocuments.length,
-        verifiedDocs: verifiedCount || demoDocuments.filter(d => d.integrity_status === 'VERIFIED').length,
-        anchoredDocs: anchoredCount || 1,
-        sharedDocs: sharedCount || 2,
-      };
-    } catch {
-      return { totalDocs: demoDocuments.length, verifiedDocs: 2, anchoredDocs: 1, sharedDocs: 2 };
+      await supabase.storage
+        .from('documents')
+        .remove([document.storage_path]);
+    } catch (storageErr) {
+      console.warn(`Failed to delete storage file ${document.storage_path}:`, storageErr);
     }
-  },
 
-  async deleteDocument(doc: Document): Promise<void> {
-    demoDocuments = demoDocuments.filter(d => d.id !== doc.id);
-    try {
-      await supabase.storage.from('documents').remove([doc.storage_path]);
-      await supabase.from('documents').delete().eq('id', doc.id);
-    } catch (e) {
-      console.warn('delete warning:', e);
+    // 4. Log deletion to audit trail
+    if (user?.user) {
+      try {
+        await supabase.from('audit_logs').insert({
+          user_id: user.user.id,
+          document_id: null,
+          action: 'DOCUMENT_DELETED',
+          metadata: { name: document.name, document_id: document.id },
+        });
+      } catch (e) {}
     }
-  },
+  }
 };

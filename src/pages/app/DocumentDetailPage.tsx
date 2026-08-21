@@ -1,3 +1,8 @@
+// ============================================================
+// TrustLink Web — Document Detail & Blockchain Proof View
+// Complete feature parity with mobile app
+// ============================================================
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -13,17 +18,26 @@ import {
   AlertTriangle, 
   Clock,
   X,
-  Eye,
-  Check
+  Copy,
+  Check,
+  Shield,
+  Layers,
+  Sparkles,
+  RefreshCw,
+  Send
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { HashDisplay } from '@/components/ui/HashDisplay';
+import { supabase } from '@/lib/supabase';
 import { documentService } from '@/services/documentService';
+import { integrityService } from '@/services/integrityService';
+import { blockchainService } from '@/services/blockchainService';
 import { shareService } from '@/services/shareService';
 import { Document, BlockchainProof, SharePermission } from '@/types';
-import { BLOCKCHAIN_EXPLORER_BASE } from '@/lib/constants';
+import { BLOCKCHAIN_EXPLORER_BASE, CONTRACT_EXPLORER_BASE, CONTRACT_ADDRESS } from '@/lib/constants';
+import { truncateHash, truncateTxHash } from '@/lib/crypto';
 
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +47,10 @@ export function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [anchoring, setAnchoring] = useState(false);
-  const [verificationFeedback, setVerificationFeedback] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [verificationFeedback, setVerificationFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   // Share Modal State
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -41,65 +58,132 @@ export function DocumentDetailPage() {
   const [sharePermission, setSharePermission] = useState<SharePermission>('VIEW');
   const [shareExpiry, setShareExpiry] = useState<'1h' | '24h' | '7d' | 'never'>('24h');
   const [isSharing, setIsSharing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
+
+  const loadDocumentData = async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (docError || !docData) {
+        throw new Error(docError?.message || 'Document not found');
+      }
+
+      setDoc(docData as Document);
+
+      // Fetch blockchain proof
+      const proofData = await blockchainService.getBlockchainProof(id);
+      setProof(proofData);
+    } catch (err: any) {
+      console.warn('Error loading document detail:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (id) {
-      documentService.getDocumentById(id)
-        .then(data => setDoc(data))
-        .catch(console.warn)
-        .finally(() => setLoading(false));
-    }
+    loadDocumentData();
   }, [id]);
 
-  const handleVerify = () => {
-    setVerifying(true);
-    setVerificationFeedback(null);
-    setTimeout(() => {
-      setVerifying(false);
-      if (doc) {
-        setDoc({ ...doc, integrity_status: 'VERIFIED' });
-      }
-      setVerificationFeedback('Cryptographic integrity confirmed: Local binary SHA-256 hash matches the registered reference.');
-    }, 1200);
+  const copyToClipboard = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleAnchor = () => {
-    setAnchoring(true);
-    setTimeout(() => {
-      setAnchoring(false);
-      setProof({
-        id: 'proof-1',
-        document_id: doc?.id || '',
-        document_hash: doc?.current_hash || '0x4f82a93...',
-        transaction_hash: '0x8A3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b',
-        block_number: 5894123,
-        blockchain_network: 'Ethereum Sepolia',
-        status: 'CONFIRMED',
-        anchored_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
-      });
-    }, 1500);
-  };
-
-  const handleDownload = () => {
+  const handleVerify = async () => {
     if (!doc) return;
-    // Download content as a blob
-    const content = `TrustLink Verified Document\nName: ${doc.name}\nSHA-256: ${doc.current_hash || 'N/A'}\nCreated: ${doc.created_at}`;
-    const blob = new Blob([content], { type: doc.mime_type });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = doc.name;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      setVerifying(true);
+      setVerificationFeedback(null);
+
+      const isLocalMatch = await integrityService.verifyDocument(doc);
+      const dualResult = await blockchainService.verifyDualIntegrity(
+        doc.name,
+        doc.current_hash || '',
+        doc.current_hash,
+        proof
+      );
+
+      if (isLocalMatch && dualResult.blockchainMatch !== false) {
+        setDoc({ ...doc, integrity_status: 'VERIFIED' });
+        setVerificationFeedback({
+          success: true,
+          message: `✓ Cryptographic Integrity Verified: Cloud storage bytes exactly match the SHA-256 fingerprint. ${proof ? 'Confirmed on Ethereum Sepolia.' : 'Vault reference intact.'}`,
+        });
+      } else {
+        setDoc({ ...doc, integrity_status: 'FAILED' });
+        setVerificationFeedback({
+          success: false,
+          message: '⚠ Fingerprint Mismatch Detected: The file bytes differ from the registered reference record.',
+        });
+      }
+    } catch (err: any) {
+      setVerificationFeedback({
+        success: false,
+        message: err.message || 'Could not verify document integrity.',
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleAnchor = async () => {
+    if (!doc) return;
+    try {
+      setAnchoring(true);
+      const newProof = await blockchainService.anchorDocument(doc.id);
+      setProof(newProof);
+      alert(`Proof Confirmed: An immutable proof for "${doc.name}" has been permanently recorded on ${newProof.blockchain_network}.`);
+    } catch (err: any) {
+      alert(err.message || 'Blockchain anchoring is currently unavailable.');
+    } finally {
+      setAnchoring(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!doc) return;
+    try {
+      setDownloading(true);
+      await documentService.downloadDocument(doc);
+    } catch (err: any) {
+      alert(err.message || 'Could not download document.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!doc) return;
+    if (!window.confirm(`Permanently delete "${doc.name}" from your vault? This will remove the file and all associated proofs.`)) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      await documentService.deleteDocument(doc);
+      navigate('/app/vault');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document.');
+      setDeleting(false);
+    }
+  };
+
+  const handleWebShare = async () => {
+    if (!doc) return;
+    await shareService.shareViaWeb(doc);
+    alert('Share link and document details copied to clipboard!');
   };
 
   const handleShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!doc || !shareRecipient.trim()) return;
 
-    setIsSharing(true);
     let expiresAt: string | null = null;
     const now = Date.now();
     if (shareExpiry === '1h') expiresAt = new Date(now + 3600 * 1000).toISOString();
@@ -107,38 +191,39 @@ export function DocumentDetailPage() {
     if (shareExpiry === '7d') expiresAt = new Date(now + 7 * 24 * 3600 * 1000).toISOString();
 
     try {
-      await shareService.shareDocument(doc.id, shareRecipient, sharePermission, expiresAt);
-      setShareSuccess(true);
-      setTimeout(() => {
-        setIsShareModalOpen(false);
-        setShareSuccess(false);
-        setShareRecipient('');
-      }, 1500);
+      setIsSharing(true);
+      await shareService.shareDocument(doc.id, shareRecipient.trim(), sharePermission, expiresAt);
+      setIsShareModalOpen(false);
+      setShareRecipient('');
+      alert(`Access granted for ${shareRecipient} (${sharePermission === 'DOWNLOAD' ? 'Download & View' : 'View Only'}).`);
     } catch (err: any) {
-      alert(err.message || 'Failed to share');
+      alert(err.message || 'Could not grant share access.');
     } finally {
       setIsSharing(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!doc) return;
-    if (confirm(`Are you sure you want to delete "${doc.name}"? This action cannot be undone.`)) {
-      try {
-        await documentService.deleteDocument(doc);
-        navigate('/app/vault');
-      } catch (err: any) {
-        alert(err.message || 'Failed to delete');
-      }
-    }
+  const formatSize = (bytes: number) => {
+    if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center py-24">
-          <div className="w-8 h-8 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-[#94A3B8]">Loading document details...</p>
+        <div className="py-24 flex flex-col items-center justify-center text-slate-400">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs">Loading document record & cryptographic proofs...</p>
         </div>
       </AppLayout>
     );
@@ -147,12 +232,10 @@ export function DocumentDetailPage() {
   if (!doc) {
     return (
       <AppLayout>
-        <div className="p-8 max-w-2xl mx-auto text-center py-20">
-          <FileText size={48} className="text-[#475569] mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-[#F1F5F9] mb-2">Document Not Found</h2>
-          <p className="text-sm text-[#94A3B8] mb-6">The document you are looking for does not exist or has been removed.</p>
-          <Link to="/app/vault">
-            <Button variant="secondary" size="md">Back to Vault</Button>
+        <div className="py-16 text-center">
+          <p className="text-sm text-slate-500 mb-4">Document not found or access revoked.</p>
+          <Link to="/app/vault" className="text-xs text-indigo-600 font-semibold hover:underline">
+            ← Back to Vault
           </Link>
         </div>
       </AppLayout>
@@ -161,274 +244,338 @@ export function DocumentDetailPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 sm:p-8 max-w-4xl">
-        <Link to="/app/vault" className="inline-flex items-center gap-1.5 text-xs text-[#00D4FF] hover:underline mb-6">
-          <ArrowLeft size={14} /> Back to Vault
-        </Link>
+      <div className="space-y-6 max-w-4xl mx-auto">
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/app/vault"
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white font-medium transition"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Vault</span>
+          </Link>
 
-        {/* Overview Header */}
-        <div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 sm:p-8 mb-6">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-[#0A0E1A] border border-[#1E293B] flex items-center justify-center text-[#00D4FF] shrink-0">
-              <FileText size={24} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-[#F1F5F9] break-words">{doc.name}</h1>
-              <p className="text-xs text-[#475569] mt-1">
-                {(doc.size / 1024).toFixed(1)} KB • Uploaded {new Date(doc.created_at).toLocaleString()}
-              </p>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleWebShare}
+              className="gap-1.5 text-xs py-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Link</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setIsShareModalOpen(true)}
+              className="gap-1.5 text-xs py-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Grant In-App Access</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="gap-1.5 text-xs py-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{downloading ? 'Downloading...' : 'Download'}</span>
+            </Button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="p-2 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition"
+              title="Delete Document"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Cryptographic Identity */}
-        <div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 mb-6">
-          <h2 className="text-xs font-bold text-[#F1F5F9] uppercase tracking-widest mb-4">Cryptographic Identity</h2>
-          <div className="space-y-4">
-            <HashDisplay hash={doc.current_hash || 'a3f8c2e91d47b65f0e8a2c3d4b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3'} label="SHA-256 Binary Hash" />
-            
-            <div className="flex items-center justify-between p-4 bg-[#0A0E1A] border border-[#1E293B] rounded-xl">
-              <div>
-                <p className="text-xs font-semibold text-[#94A3B8]">Integrity Verification Status</p>
-                <p className="text-[11px] text-[#475569]">Calculated via deterministic binary digest comparison</p>
+        {/* Verification Result Feedback Banner */}
+        {verificationFeedback && (
+          <div
+            className={`p-4 rounded-xl border text-xs flex items-start gap-3 animate-in fade-in duration-200 ${
+              verificationFeedback.success
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+            }`}
+          >
+            {verificationFeedback.success ? (
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+            )}
+            <p className="leading-relaxed">{verificationFeedback.message}</p>
+          </div>
+        )}
+
+        {/* File Overview Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 shrink-0">
+                <FileText className="w-7 h-7" />
               </div>
               <div>
-                {doc.integrity_status === 'VERIFIED' ? (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-[#10B981] bg-[rgba(16,185,129,0.12)] px-2.5 py-1 rounded-md border border-[rgba(16,185,129,0.3)]">
-                    <CheckCircle size={14} /> Verified Intact
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-[#F59E0B] bg-[rgba(245,158,11,0.12)] px-2.5 py-1 rounded-md border border-[rgba(245,158,11,0.3)]">
-                    <Clock size={14} /> Pending Verification
-                  </span>
-                )}
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white break-all">
+                  {doc.name}
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  {formatSize(doc.size)} • Uploaded {formatDate(doc.created_at)}
+                </p>
               </div>
             </div>
 
-            {verificationFeedback && (
-              <div className="p-3 bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.3)] rounded-xl flex items-center gap-2 text-xs text-[#10B981]">
-                <CheckCircle size={16} />
-                <span>{verificationFeedback}</span>
-              </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider self-start sm:self-center ${
+                doc.integrity_status === 'VERIFIED'
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                  : doc.integrity_status === 'FAILED'
+                  ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                  : 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+              }`}
+            >
+              {doc.integrity_status}
+            </span>
+          </div>
+        </div>
+
+        {/* SHA-256 Digital Fingerprint Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                SHA-256 Cryptographic Fingerprint
+              </h2>
+            </div>
+            {doc.current_hash && (
+              <button
+                onClick={() => copyToClipboard(doc.current_hash!, 'hash')}
+                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-lg transition"
+              >
+                {copiedField === 'hash' ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span className="text-emerald-600">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy Hash</span>
+                  </>
+                )}
+              </button>
             )}
           </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            This 256-bit hash is computed mathematically from the exact binary bytes of this document. Any modification to the file content completely alters this signature.
+          </p>
+          <div className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl p-3 font-mono text-xs text-indigo-600 dark:text-indigo-400 break-all select-all">
+            {doc.current_hash || 'No hash generated'}
+          </div>
         </div>
 
-        {/* Blockchain Proof Section */}
-        <div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-bold text-[#F1F5F9] uppercase tracking-widest">Blockchain Proof (Sepolia)</h2>
-            {proof && (
-              <span className="text-[10px] font-bold text-[#8B5CF6] bg-[rgba(139,92,246,0.12)] px-2 py-0.5 rounded border border-[rgba(139,92,246,0.3)]">
-                Ethereum Sepolia
+        {/* Ethereum Sepolia Blockchain Proof Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Ethereum Blockchain Proof
+              </h2>
+            </div>
+            {proof?.status === 'CONFIRMED' && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                Confirmed on Sepolia
               </span>
             )}
           </div>
 
           {proof ? (
-            <div className="bg-[#0A0E1A] border border-[rgba(139,92,246,0.3)] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs border-b border-[#1E293B] pb-2">
-                <span className="text-[#475569]">Network</span>
-                <span className="text-[#F1F5F9] font-medium">{proof.blockchain_network}</span>
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-xl p-4 space-y-3 text-xs">
+              <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-500">Blockchain Network</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{proof.blockchain_network}</span>
               </div>
-              <div className="flex items-center justify-between text-xs border-b border-[#1E293B] pb-2">
-                <span className="text-[#475569]">Status</span>
-                <span className="text-[#8B5CF6] font-bold">{proof.status}</span>
+              <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-500">Smart Contract</span>
+                <a
+                  href={`${CONTRACT_EXPLORER_BASE}${CONTRACT_ADDRESS}#code`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-indigo-600 hover:underline flex items-center gap-1"
+                >
+                  <span>{truncateTxHash(CONTRACT_ADDRESS)}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
               {proof.transaction_hash && (
-                <div className="flex items-center justify-between text-xs border-b border-[#1E293B] pb-2">
-                  <span className="text-[#475569]">Tx Hash</span>
+                <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <span className="text-slate-500">Transaction Hash</span>
                   <a
                     href={`${BLOCKCHAIN_EXPLORER_BASE}${proof.transaction_hash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#00D4FF] hover:underline flex items-center gap-1 font-mono"
+                    className="font-mono text-indigo-600 hover:underline flex items-center gap-1"
                   >
-                    {proof.transaction_hash.slice(0, 10)}...{proof.transaction_hash.slice(-8)}
-                    <ExternalLink size={12} />
+                    <span>{truncateTxHash(proof.transaction_hash)}</span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}
               {proof.block_number && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#475569]">Block Height</span>
-                  <span className="text-[#F1F5F9] font-mono">#{proof.block_number}</span>
+                <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <span className="text-slate-500">Mined Block Height</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">#{proof.block_number}</span>
+                </div>
+              )}
+              {proof.anchored_at && (
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-slate-500">Anchored Timestamp</span>
+                  <span className="text-slate-700 dark:text-slate-300">{formatDate(proof.anchored_at)}</span>
                 </div>
               )}
             </div>
           ) : (
-            <div className="bg-[#0A0E1A] border border-[#1E293B] rounded-xl p-5 text-center">
-              <p className="text-xs text-[#94A3B8] mb-4">
-                This document has not been anchored to Ethereum Sepolia yet. Anchoring generates a public, timestamped cryptographic proof of existence.
+            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-5 border border-dashed border-slate-200 dark:border-slate-700 text-center">
+              <p className="text-xs text-slate-500 mb-4 max-w-md mx-auto">
+                This document has not been anchored to Ethereum yet. Creating a blockchain proof records an unalterable timestamp on the public Sepolia ledger.
               </p>
-              <Button 
-                variant="blockchain" 
-                size="sm" 
-                loading={anchoring}
+              <Button
+                variant="primary"
                 onClick={handleAnchor}
-                icon={<Link2 size={14} />}
+                disabled={anchoring || verifying}
+                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
               >
-                Anchor to Ethereum Sepolia
+                <Link2 className="w-3.5 h-3.5" />
+                <span>{anchoring ? 'Anchoring to Sepolia...' : 'Create Blockchain Proof'}</span>
               </Button>
             </div>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button 
-            variant="primary" 
-            size="md" 
-            loading={verifying}
+        {/* Primary Verification Action */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Button
+            variant="primary"
             onClick={handleVerify}
-            icon={<ShieldCheck size={16} />}
-            className="flex-1"
+            disabled={verifying || anchoring}
+            className="flex-1 py-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold shadow-md"
           >
-            Verify Cryptographic Integrity
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="md" 
-            onClick={() => setIsShareModalOpen(true)}
-            icon={<Share2 size={16} />}
-          >
-            Share
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="md" 
-            onClick={handleDownload}
-            icon={<Download size={16} />}
-          >
-            Download
-          </Button>
-          <Button 
-            variant="danger" 
-            size="md" 
-            onClick={handleDelete}
-            icon={<Trash2 size={16} />}
-          >
-            Delete
+            <ShieldCheck className="w-4 h-4" />
+            <span>{verifying ? 'Re-Computing Cryptographic Signature...' : 'Verify Cryptographic Integrity'}</span>
           </Button>
         </div>
-      </div>
 
-      {/* ============================================================ */}
-      {/* Share Document Modal */}
-      {/* ============================================================ */}
-      {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.75)] backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative animate-[fade-in_0.2s_ease-out]">
-            <button
-              onClick={() => setIsShareModalOpen(false)}
-              className="absolute top-5 right-5 text-[#475569] hover:text-[#F1F5F9] transition-colors"
-            >
-              <X size={20} />
-            </button>
+        {/* Grant In-App Sharing Modal */}
+        {isShareModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-indigo-600" />
+                  <span>Grant In-App Access</span>
+                </h3>
+                <button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.08)] border border-[rgba(0,212,255,0.3)] flex items-center justify-center text-[#00D4FF]">
-                <Share2 size={20} />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-[#F1F5F9]">Share Document</h2>
-                <p className="text-xs text-[#475569]">Grant time-bounded granular permissions</p>
-              </div>
-            </div>
-
-            {shareSuccess ? (
-              <div className="py-8 text-center space-y-2">
-                <CheckCircle size={40} className="text-[#10B981] mx-auto" />
-                <p className="text-base font-bold text-[#F1F5F9]">Share Created Successfully!</p>
-                <p className="text-xs text-[#94A3B8]">Access granted to {shareRecipient}</p>
-              </div>
-            ) : (
-              <form onSubmit={handleShareSubmit} className="space-y-4">
-                <Input
-                  label="Recipient Email / User ID"
-                  placeholder="colleague@example.com"
-                  value={shareRecipient}
-                  onChange={e => setShareRecipient(e.target.value)}
-                  required
-                  autoFocus
-                />
+              <form onSubmit={handleShareSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                    Recipient Email Address
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="colleague@enterprise.com"
+                    value={shareRecipient}
+                    onChange={(e) => setShareRecipient(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider block mb-2">
-                    Permission Level
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                    Access Permission
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setSharePermission('VIEW')}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                      className={`p-2.5 rounded-lg border text-center font-medium transition ${
                         sharePermission === 'VIEW'
-                          ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
-                          : 'bg-[#0A0E1A] text-[#94A3B8] border-[#1E293B]'
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                       }`}
                     >
-                      <Eye size={14} /> VIEW ONLY
+                      View Only
                     </button>
                     <button
                       type="button"
                       onClick={() => setSharePermission('DOWNLOAD')}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                      className={`p-2.5 rounded-lg border text-center font-medium transition ${
                         sharePermission === 'DOWNLOAD'
-                          ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
-                          : 'bg-[#0A0E1A] text-[#94A3B8] border-[#1E293B]'
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                       }`}
                     >
-                      <Download size={14} /> DOWNLOAD
+                      Download & View
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider block mb-2">
-                    Access Duration
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                    Access Expiration
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['1h', '24h', '7d', 'never'] as const).map(opt => (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['1h', '24h', '7d', 'never'] as const).map((exp) => (
                       <button
-                        key={opt}
+                        key={exp}
                         type="button"
-                        onClick={() => setShareExpiry(opt)}
-                        className={`py-2 text-xs font-semibold rounded-lg border uppercase transition-all ${
-                          shareExpiry === opt
-                            ? 'bg-[rgba(0,212,255,0.12)] text-[#00D4FF] border-[#00D4FF]'
-                            : 'bg-[#0A0E1A] text-[#475569] border-[#1E293B]'
+                        onClick={() => setShareExpiry(exp)}
+                        className={`py-1.5 rounded-lg border text-center text-[11px] font-medium transition uppercase ${
+                          shareExpiry === exp
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                         }`}
                       >
-                        {opt}
+                        {exp === 'never' ? 'Never' : exp}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-3">
+                <div className="flex items-center justify-end gap-2 pt-2">
                   <Button
                     type="button"
                     variant="ghost"
-                    size="md"
                     onClick={() => setIsShareModalOpen(false)}
+                    className="text-xs"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     variant="primary"
-                    size="md"
-                    loading={isSharing}
-                    disabled={!shareRecipient.trim()}
+                    disabled={isSharing || !shareRecipient.trim()}
+                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    Confirm Share
+                    {isSharing ? 'Sharing...' : 'Grant Access'}
                   </Button>
                 </div>
               </form>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </AppLayout>
   );
 }

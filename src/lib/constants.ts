@@ -1,12 +1,15 @@
 // ============================================================
 // TrustLink Web — App Constants
-// Mirrors mobile app constants/index.ts
+// Mirrors mobile app constants/index.ts exactly
 // ============================================================
 
 export const APP_NAME = 'TrustLink';
 
 export const BLOCKCHAIN_NETWORK = 'Ethereum Sepolia';
+export const CONTRACT_ADDRESS = '0x1b9A1FBD6FC714B1aC443d00a555529567bd8D0E';
 export const BLOCKCHAIN_EXPLORER_BASE = 'https://sepolia.etherscan.io/tx/';
+export const CONTRACT_EXPLORER_BASE = 'https://sepolia.etherscan.io/address/';
+export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 export const MAX_FILE_SIZE_LABEL = '50 MB';
@@ -24,6 +27,12 @@ export const ALLOWED_MIME_TYPES = [
 ];
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  USER_LOGIN: 'User signed in',
+  USER_LOGOUT: 'User signed out',
+  USER_REGISTERED: 'User account created',
+  FOLDER_CREATED: 'Folder created',
+  FOLDER_RENAMED: 'Folder renamed',
+  FOLDER_DELETED: 'Folder deleted',
   DOCUMENT_UPLOADED: 'Document uploaded',
   DOCUMENT_VIEWED: 'Document viewed',
   DOCUMENT_DOWNLOADED: 'Document downloaded',

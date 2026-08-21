@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-08-19T08:17:48.395Z",
+  "timestamp": "2026-08-19T08:19:00.111Z",
   "testType": "Load & High-Throughput Performance",
   "totalRequests": 100,
-  "totalDurationMs": 6.88,
-  "averageLatencyMs": 0.064,
-  "p95LatencyMs": 0.161,
-  "throughputRps": 14538.9,
+  "totalDurationMs": 6.24,
+  "averageLatencyMs": 0.058,
+  "p95LatencyMs": 0.143,
+  "throughputRps": 16021.8,
   "status": "PASSED",
   "metrics": {
-    "memoryHeapUsedMB": 5.2,
+    "memoryHeapUsedMB": 5.28,
     "cpuThroughputScore": 99.4
   }
 }

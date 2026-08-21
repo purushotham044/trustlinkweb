@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-19T08:17:48.707Z",
+  "timestamp": "2026-08-19T08:18:54.905Z",
   "product": "TrustLink Web & Application Platform",
   "overallStatus": "PASSED",
   "testSuites": {
@@ -11,8 +11,8 @@
     },
     "loadAndPerformance": {
       "totalRequests": 100,
-      "averageLatencyMs": 0.064,
-      "throughputRps": 14538.9,
+      "averageLatencyMs": 0.056,
+      "throughputRps": 16633.1,
       "status": "PASSED"
     },
     "seleniumWebE2E": {
