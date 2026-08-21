@@ -1,22 +1,17 @@
 // ============================================================
-// TrustLink Web — TypeScript Types
-// Matches the mobile app and Supabase backend exactly
+// TrustLink Web — TypeScript Type Definitions
 // ============================================================
 
-export type IntegrityStatus = 'PENDING' | 'VERIFIED' | 'FAILED';
-export type SharePermission = 'VIEW' | 'DOWNLOAD';
+export type IntegrityStatus = 'VERIFIED' | 'PENDING' | 'FAILED';
+
 export type BlockchainStatus = 'PENDING' | 'CONFIRMED' | 'FAILED';
 
+export type SharePermission = 'VIEW' | 'DOWNLOAD';
+
 export type AuditAction =
-  | 'USER_LOGIN'
-  | 'USER_LOGOUT'
-  | 'USER_REGISTERED'
-  | 'FOLDER_CREATED'
-  | 'FOLDER_RENAMED'
-  | 'FOLDER_DELETED'
   | 'DOCUMENT_UPLOADED'
-  | 'DOCUMENT_VIEWED'
   | 'DOCUMENT_DOWNLOADED'
+  | 'DOCUMENT_VIEWED'
   | 'DOCUMENT_RENAMED'
   | 'DOCUMENT_MOVED'
   | 'DOCUMENT_DELETED'
@@ -27,21 +22,23 @@ export type AuditAction =
   | 'BLOCKCHAIN_ANCHORED'
   | 'BLOCKCHAIN_ANCHOR_FAILED';
 
-export interface UserProfile {
+export interface Profile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 }
+
+export type UserProfile = Profile;
 
 export interface Folder {
   id: string;
   owner_id: string;
+  parent_id: string | null;
   name: string;
-  parent_folder_id: string | null;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 }
 
 export interface Document {
@@ -109,12 +106,18 @@ export type AuditCategory = 'ALL' | 'BLOCKCHAIN' | 'INTEGRITY' | 'SHARING' | 'FI
 
 export interface VerificationResult {
   documentName: string;
-  currentHash: string;
-  storedHash: string | null;
-  blockchainHash: string | null;
-  trustlinkMatch: boolean;
+  currentHash?: string;
+  localHash?: string;
+  storedHash?: string | null;
+  databaseHash?: string | null;
+  blockchainHash?: string | null;
+  trustlinkMatch?: boolean;
+  dbMatch?: boolean;
   blockchainMatch: boolean | null;
-  blockchainProof: BlockchainProof | null;
+  blockchainProof?: BlockchainProof | null;
+  blockchainNetwork?: string | null;
+  transactionHash?: string | null;
+  blockNumber?: number | null;
   overallVerified: boolean;
   verifiedAt: string;
 }

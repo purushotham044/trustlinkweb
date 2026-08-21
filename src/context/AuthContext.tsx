@@ -127,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       full_name: 'Security Analyst (Demo)',
       avatar_url: null,
       created_at: demoUser.created_at,
+      updated_at: demoUser.created_at,
     });
     setInitialized(true);
   }, []);
