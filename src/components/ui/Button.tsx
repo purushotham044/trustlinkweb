@@ -20,10 +20,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary: 'bg-[#00D4FF] hover:bg-[#00B4D8] text-[#0A0E1A] font-bold shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:shadow-[0_0_25px_rgba(0,212,255,0.35)] focus:ring-[#00D4FF]',
-      secondary: 'bg-[#111827] hover:bg-[#1A2235] text-[#F1F5F9] border border-[#1E293B] hover:border-[#2D3748] focus:ring-[#475569]',
-      danger: 'bg-[rgba(239,68,68,0.1)] hover:bg-[rgba(239,68,68,0.2)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] focus:ring-[#EF4444]',
-      ghost: 'bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#94A3B8] hover:text-[#F1F5F9] focus:ring-[#475569]',
-      blockchain: 'bg-[rgba(139,92,246,0.12)] hover:bg-[rgba(139,92,246,0.2)] text-[#A78BFA] border border-[rgba(139,92,246,0.3)] focus:ring-[#8B5CF6]',
+      secondary: 'bg-white dark:bg-[#111827] hover:bg-slate-50 dark:hover:bg-[#1A2235] text-slate-800 dark:text-[#F1F5F9] border border-slate-200 dark:border-[#1E293B] hover:border-slate-300 dark:hover:border-[#2D3748] focus:ring-[#475569] shadow-sm',
+      danger: 'bg-red-50 dark:bg-[rgba(239,68,68,0.1)] hover:bg-red-100 dark:hover:bg-[rgba(239,68,68,0.2)] text-red-600 dark:text-[#EF4444] border border-red-200 dark:border-[rgba(239,68,68,0.3)] focus:ring-[#EF4444]',
+      ghost: 'bg-transparent hover:bg-slate-100 dark:hover:bg-[rgba(255,255,255,0.05)] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-[#F1F5F9] focus:ring-[#475569]',
+      blockchain: 'bg-purple-50 dark:bg-[rgba(139,92,246,0.12)] hover:bg-purple-100 dark:hover:bg-[rgba(139,92,246,0.2)] text-purple-700 dark:text-[#A78BFA] border border-purple-200 dark:border-[rgba(139,92,246,0.3)] focus:ring-[#8B5CF6]',
     };
 
     const widthStyle = fullWidth ? 'w-full' : '';

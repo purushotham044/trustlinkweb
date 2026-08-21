@@ -3,7 +3,7 @@
 // Provides rich visual feedback with step transitions during file upload
 // ============================================================
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Shield, Check, CloudUpload, Lock, Database, Loader2 } from 'lucide-react';
 
 export interface UploadProgressState {
@@ -16,9 +16,23 @@ export interface UploadProgressState {
 
 interface UploadProgressModalProps {
   state: UploadProgressState;
+  onClose?: () => void;
 }
 
-export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({ state }) => {
+export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({ state, onClose }) => {
+  // Auto-close after completion
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (state.visible && state.isComplete && onClose) {
+      timer = setTimeout(() => {
+        onClose();
+      }, 1400);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [state.visible, state.isComplete, onClose]);
+
   if (!state.visible) return null;
 
   const getProgressPercentage = () => {
@@ -150,9 +164,19 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({ state 
         </div>
 
         {/* Status Text */}
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 italic text-center">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 italic text-center mb-3">
           {state.statusText}
         </p>
+
+        {/* Done / Dismiss Button */}
+        {state.isComplete && onClose && (
+          <button
+            onClick={onClose}
+            className="px-6 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-semibold shadow-md transition-all active:scale-95"
+          >
+            Done
+          </button>
+        )}
       </div>
     </div>
   );
