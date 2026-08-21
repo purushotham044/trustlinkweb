@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// Auth Provider
+// Auth & Theme Providers
 import { AuthProvider } from '@/context/AuthContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 // Layout & Guards
 import { PrivateRoute } from '@/components/layout/PrivateRoute';
@@ -32,8 +33,9 @@ import { ProfilePage } from '@/pages/app/ProfilePage';
 
 export function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           {/* Public Marketing & Demo Routes */}
           <Route path="/" element={<HomePage />} />
@@ -117,6 +119,7 @@ export function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 
