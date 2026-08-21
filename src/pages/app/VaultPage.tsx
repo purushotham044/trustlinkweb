@@ -1,6 +1,6 @@
 // ============================================================
 // TrustLink Web — Professional Vault Page (File & Folder Explorer)
-// Complete feature parity with mobile app
+// Complete feature parity with mobile app: Multi-Select & Batch Actions
 // ============================================================
 
 import React, { useState, useRef } from 'react';
@@ -24,7 +24,7 @@ import {
   Trash2,
   Shield,
   FolderMinus,
-  Sparkles
+  Check
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
@@ -40,6 +40,10 @@ export function VaultPage() {
   const [currentFolderName, setCurrentFolderName] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const { documents, folders, loading, error, refresh } = useDocuments(currentFolderId);
+
+  // Multi-selection state
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const isSelectionMode = selectedKeys.size > 0;
 
   // Upload modal & live animation state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +75,59 @@ export function VaultPage() {
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const totalFilteredCount = filteredDocs.length + filteredFolders.length;
+
+  const toggleItemSelection = (key: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedKeys.size === totalFilteredCount) {
+      setSelectedKeys(new Set());
+    } else {
+      const allKeys = new Set([
+        ...filteredFolders.map(f => `folder-${f.id}`),
+        ...filteredDocs.map(d => `doc-${d.id}`),
+      ]);
+      setSelectedKeys(allKeys);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const count = selectedKeys.size;
+    if (count === 0) return;
+
+    if (!window.confirm(`Are you sure you want to permanently delete ${count} selected item${count > 1 ? 's' : ''}?`)) {
+      return;
+    }
+
+    try {
+      const selectedFolders = folders.filter(f => selectedKeys.has(`folder-${f.id}`));
+      const selectedDocuments = documents.filter(d => selectedKeys.has(`doc-${d.id}`));
+
+      for (const folder of selectedFolders) {
+        await folderService.deleteFolder(folder.id);
+      }
+      for (const doc of selectedDocuments) {
+        await documentService.deleteDocument(doc);
+      }
+
+      setSelectedKeys(new Set());
+      await refresh();
+    } catch (err: any) {
+      alert(err.message || 'Could not delete selected items');
+    }
+  };
+
   const getFileIcon = (mime: string) => {
     if (mime.includes('pdf')) return <FileText className="w-6 h-6 text-rose-500" />;
     if (mime.includes('image')) return <ImageIcon className="w-6 h-6 text-blue-500" />;
@@ -84,8 +141,8 @@ export function VaultPage() {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, {
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -107,29 +164,27 @@ export function VaultPage() {
       visible: true,
       fileName: file.name,
       step: 1,
-      statusText: 'Computing SHA-256 digital fingerprint...',
+      statusText: 'Reading file & calculating SHA-256 fingerprint...',
       isComplete: false,
     });
 
     try {
-      await documentService.uploadDocument(
-        file,
-        currentFolderId,
-        (step, statusText) => {
-          setUploadProgress(prev => ({
-            ...prev,
-            step,
-            statusText,
-            isComplete: step >= 4,
-          }));
-        }
-      );
+      await documentService.uploadDocument(file, currentFolderId, (step, statusText) => {
+        setUploadProgress(prev => ({
+          ...prev,
+          step,
+          statusText,
+        }));
+      });
+
+      setUploadProgress(prev => ({
+        ...prev,
+        step: 4,
+        statusText: 'Document secured in your vault!',
+        isComplete: true,
+      }));
 
       await refresh();
-
-      setTimeout(() => {
-        setUploadProgress(prev => ({ ...prev, visible: false }));
-      }, 800);
     } catch (err: any) {
       setUploadProgress(prev => ({ ...prev, visible: false }));
       alert(err.message || 'File upload failed');
@@ -138,15 +193,15 @@ export function VaultPage() {
 
   const handleOpenCreateFolder = () => {
     setFolderModalMode('create');
-    setTargetFolder(null);
     setFolderNameInput('');
+    setTargetFolder(null);
     setFolderModalOpen(true);
   };
 
   const handleOpenRenameFolder = (folder: Folder) => {
     setFolderModalMode('rename');
-    setTargetFolder(folder);
     setFolderNameInput(folder.name);
+    setTargetFolder(folder);
     setFolderModalOpen(true);
     setActiveDropdownFolderId(null);
   };
@@ -205,12 +260,14 @@ export function VaultPage() {
     setCurrentFolderId(folder.id);
     setCurrentFolderName(folder.name);
     setActiveDropdownFolderId(null);
+    setSelectedKeys(new Set());
   };
 
   const handleLeaveFolder = () => {
     setCurrentFolderId(null);
     setCurrentFolderName('');
     setActiveDropdownFolderId(null);
+    setSelectedKeys(new Set());
   };
 
   return (
@@ -249,22 +306,24 @@ export function VaultPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {!isInsideFolder && (
               <Button
                 variant="secondary"
+                size="sm"
                 onClick={handleOpenCreateFolder}
-                className="gap-1.5 text-xs py-2"
+                className="gap-1.5 text-xs"
               >
-                <Plus className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                <Plus className="w-4 h-4" />
                 <span>New Folder</span>
               </Button>
             )}
 
             <Button
               variant="primary"
+              size="sm"
               onClick={handleTriggerFileInput}
-              className="gap-1.5 text-xs py-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               <Upload className="w-4 h-4" />
               <span>Upload Document</span>
@@ -272,124 +331,157 @@ export function VaultPage() {
           </div>
         </div>
 
-        {/* Search & Breadcrumb Bar */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <button
-              onClick={handleLeaveFolder}
-              className={`hover:text-indigo-600 font-medium ${!isInsideFolder ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : ''}`}
-            >
-              Vault Root
-            </button>
-            {isInsideFolder && (
-              <>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-semibold text-slate-900 dark:text-white truncate max-w-xs">
-                  {currentFolderName}
-                </span>
-              </>
-            )}
-          </div>
+        {/* Multi-Select Action Bar */}
+        {isSelectionMode ? (
+          <div className="flex items-center justify-between p-3.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-xl animate-in fade-in duration-150">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedKeys(new Set())}
+                className="p-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                title="Clear selection"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                {selectedKeys.size} Selected
+              </span>
+            </div>
 
-          {/* Search Input */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+              >
+                {selectedKeys.size === totalFilteredCount ? 'Deselect All' : 'Select All'}
+              </button>
+
+              <button
+                onClick={handleBatchDelete}
+                className="px-3 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete ({selectedKeys.size})</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Search Bar */
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Input
               type="text"
-              placeholder={isInsideFolder ? `Search in ${currentFolderName}...` : 'Search documents & folders...'}
+              placeholder={isInsideFolder ? `Search in ${currentFolderName}...` : 'Search vault documents and folders...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="pl-10 text-xs py-2 bg-white dark:bg-slate-900"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Content Explorer Grid / List */}
+        {/* Content Area */}
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-            <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-xs">Loading vault contents...</p>
+          <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
+            <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs">Loading vault cryptographic assets...</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Folders Section (Only shown at root level when folders exist) */}
-            {!isInsideFolder && filteredFolders.length > 0 && (
+            {/* Folders Section (Only shown at root or inside folder if subfolders exist) */}
+            {filteredFolders.length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Folders ({filteredFolders.length})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {filteredFolders.map((folder) => (
-                    <div
-                      key={folder.id}
-                      className="relative group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 rounded-xl p-3.5 flex items-center justify-between transition shadow-sm hover:shadow"
-                    >
-                      <button
-                        onClick={() => handleEnterFolder(folder)}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  {filteredFolders.map((folder) => {
+                    const isSelected = selectedKeys.has(`folder-${folder.id}`);
+                    return (
+                      <div
+                        key={folder.id}
+                        className={`relative group bg-white dark:bg-slate-900 border rounded-xl p-3.5 flex items-center justify-between transition shadow-sm hover:shadow ${
+                          isSelected
+                            ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600'
+                        }`}
                       >
-                        <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                          <FolderIcon className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {folder.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            Created {formatDate(folder.created_at)}
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* 3-Dots Options Menu */}
-                      <div className="relative">
+                        {/* Checkbox */}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDropdownFolderId(activeDropdownFolderId === folder.id ? null : folder.id);
-                          }}
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          onClick={(e) => toggleItemSelection(`folder-${folder.id}`, e)}
+                          className={`w-5 h-5 rounded border mr-2 flex items-center justify-center transition shrink-0 ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-transparent hover:border-slate-400'
+                          }`}
                         >
-                          <MoreVertical className="w-4 h-4" />
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
                         </button>
 
-                        {activeDropdownFolderId === folder.id && (
-                          <div className="absolute right-0 top-7 z-20 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-150">
-                            <button
-                              onClick={() => handleOpenRenameFolder(folder)}
-                              className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Rename Folder</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFolderPreservingFiles(folder)}
-                              className="w-full px-3 py-2 text-left text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2"
-                            >
-                              <FolderMinus className="w-3.5 h-3.5" />
-                              <span>Delete (Keep Files)</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFolderAll(folder)}
-                              className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete Folder & All Files</span>
-                            </button>
+                        <button
+                          onClick={() => handleEnterFolder(folder)}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <FolderIcon className="w-4 h-4" />
                           </div>
-                        )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              {folder.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Created {formatDate(folder.created_at)}
+                            </p>
+                          </div>
+                        </button>
+
+                        {/* 3-Dots Options Menu */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdownFolderId(activeDropdownFolderId === folder.id ? null : folder.id);
+                            }}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {activeDropdownFolderId === folder.id && (
+                            <div className="absolute right-0 top-7 z-20 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-150">
+                              <button
+                                onClick={() => handleOpenRenameFolder(folder)}
+                                className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Rename Folder</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFolderPreservingFiles(folder)}
+                                className="w-full px-3 py-2 text-left text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2"
+                              >
+                                <FolderMinus className="w-3.5 h-3.5" />
+                                <span>Delete (Keep Files)</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFolderAll(folder)}
+                                className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete Folder & All Files</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -422,111 +514,131 @@ export function VaultPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredDocs.map((doc) => (
-                    <Link
-                      key={doc.id}
-                      to={`/app/documents/${doc.id}`}
-                      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 rounded-xl p-4 transition shadow-sm hover:shadow flex flex-col justify-between"
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 shrink-0">
-                          {getFileIcon(doc.mime_type)}
+                  {filteredDocs.map((doc) => {
+                    const isSelected = selectedKeys.has(`doc-${doc.id}`);
+                    return (
+                      <div
+                        key={doc.id}
+                        className={`group bg-white dark:bg-slate-900 border rounded-xl p-4 transition shadow-sm hover:shadow flex flex-col justify-between relative ${
+                          isSelected
+                            ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          {/* Checkbox */}
+                          <button
+                            onClick={(e) => toggleItemSelection(`doc-${doc.id}`, e)}
+                            className={`w-5 h-5 rounded border mt-0.5 flex items-center justify-center transition shrink-0 ${
+                              isSelected
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-transparent hover:border-slate-400'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+
+                          <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 shrink-0">
+                            {getFileIcon(doc.mime_type)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Link
+                              to={`/app/documents/${doc.id}`}
+                              className="text-xs font-bold text-slate-900 dark:text-white truncate block hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                            >
+                              {doc.name}
+                            </Link>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {formatSize(doc.size)} • {formatDate(doc.created_at)}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 transition">
-                            {doc.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            {formatSize(doc.size)} • {formatDate(doc.created_at)}
-                          </p>
+
+                        {/* Status and Fingerprint */}
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[10px]">
+                          <div className="flex items-center gap-1 font-mono text-slate-400">
+                            <Shield className="w-3 h-3 text-indigo-500" />
+                            <span>{doc.current_hash ? `${doc.current_hash.slice(0, 6)}...${doc.current_hash.slice(-4)}` : 'Pending'}</span>
+                          </div>
+
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wider ${
+                              doc.integrity_status === 'VERIFIED'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40'
+                                : doc.integrity_status === 'FAILED'
+                                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40'
+                                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40'
+                            }`}
+                          >
+                            {doc.integrity_status === 'VERIFIED' && <CheckCircle className="w-2.5 h-2.5" />}
+                            {doc.integrity_status === 'FAILED' && <AlertTriangle className="w-2.5 h-2.5" />}
+                            {doc.integrity_status === 'PENDING' && <Clock className="w-2.5 h-2.5" />}
+                            <span>{doc.integrity_status}</span>
+                          </span>
                         </div>
                       </div>
-
-                      {/* Status and Fingerprint */}
-                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[10px]">
-                        <div className="flex items-center gap-1 font-mono text-slate-400">
-                          <Shield className="w-3 h-3 text-indigo-500" />
-                          <span>{doc.current_hash ? `${doc.current_hash.slice(0, 6)}...${doc.current_hash.slice(-4)}` : 'Pending'}</span>
-                        </div>
-
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider text-[9px] ${
-                            doc.integrity_status === 'VERIFIED'
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
-                              : doc.integrity_status === 'FAILED'
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'
-                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400'
-                          }`}
-                        >
-                          {doc.integrity_status}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         )}
-
-        {/* Create / Rename Folder Modal */}
-        {folderModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <FolderIcon className="w-4 h-4 text-amber-500" />
-                  <span>{folderModalMode === 'create' ? 'Create New Folder' : 'Rename Folder'}</span>
-                </h3>
-                <button
-                  onClick={() => setFolderModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleFolderSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Folder Name
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. Legal Contracts, Invoices, Tax"
-                    value={folderNameInput}
-                    onChange={(e) => setFolderNameInput(e.target.value)}
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setFolderModalOpen(false)}
-                    className="text-xs"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={isSubmittingFolder || !folderNameInput.trim()}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {isSubmittingFolder ? 'Saving...' : folderModalMode === 'create' ? 'Create Folder' : 'Rename'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Live Upload Progress & Animation Modal */}
-        <UploadProgressModal state={uploadProgress} />
       </div>
+
+      {/* New / Rename Folder Modal */}
+      {folderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+              {folderModalMode === 'create' ? 'Create New Folder' : 'Rename Folder'}
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              {folderModalMode === 'create'
+                ? 'Organize your cryptographic documents into structured collections.'
+                : `Enter a new name for "${targetFolder?.name}"`}
+            </p>
+
+            <form onSubmit={handleFolderSubmit} className="space-y-4">
+              <Input
+                type="text"
+                autoFocus
+                placeholder="Folder Name"
+                value={folderNameInput}
+                onChange={(e) => setFolderNameInput(e.target.value)}
+                className="text-xs"
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFolderModalOpen(false)}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  loading={isSubmittingFolder}
+                  className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {folderModalMode === 'create' ? 'Create Folder' : 'Save Name'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Progress Modal */}
+      <UploadProgressModal
+        state={uploadProgress}
+        onClose={() => setUploadProgress(prev => ({ ...prev, visible: false }))}
+      />
     </AppLayout>
   );
 }
