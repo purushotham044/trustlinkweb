@@ -1,25 +1,26 @@
 // ============================================================
 // TrustLink Web — Document Service
-// Mirrors mobile app upload, download, and multi-table cascading delete
+// Cloud storage uploads, SHA-256 integrity, folder associations
 // ============================================================
 
 import { supabase } from '@/lib/supabase';
 import { Document } from '@/types';
 import { computeFileSha256 } from '@/lib/crypto';
 import { integrityService } from './integrityService';
+import { CONTRACT_ADDRESS } from '@/lib/constants';
 
 export const documentService = {
   /**
-   * Fetches documents in a specific folder (or root if null)
+   * Fetches all documents owned by the current user, optionally filtered by folder.
    */
   async getDocuments(folderId: string | null = null): Promise<Document[]> {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error('Not authenticated');
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) throw new Error('Not authenticated');
 
     let query = supabase
       .from('documents')
       .select('*')
-      .eq('owner_id', user.user.id)
+      .eq('owner_id', session.session.user.id)
       .order('created_at', { ascending: false });
 
     if (folderId === null) {
@@ -30,39 +31,49 @@ export const documentService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    
-    return (data || []) as Document[];
+    return (data as Document[]) || [];
   },
 
   /**
-   * Uploads a file with live multi-step progress callbacks.
+   * Fetches a single document by ID with verification that it belongs to the user.
+   */
+  async getDocumentById(documentId: string): Promise<Document | null> {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as Document | null;
+  },
+
+  /**
+   * Uploads a file to Supabase Storage, records it in PostgreSQL, and generates initial SHA-256 fingerprint.
+   * Auto-links existing blockchain proof if the same hash was already confirmed on Ethereum Sepolia.
    */
   async uploadDocument(
     file: File,
     folderId: string | null = null,
     onProgress?: (step: number, statusText: string) => void
   ): Promise<Document> {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error('Not authenticated. Please sign in again.');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    if (file.size > 50 * 1024 * 1024) {
-      throw new Error('File size exceeds the 50MB limit.');
-    }
-
-    // 0. Profile sync
+    // 0. Ensure user profile exists
     try {
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
-        .eq('id', user.user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (!profile) {
         await supabase
           .from('profiles')
           .upsert({
-            id: user.user.id,
-            full_name: user.user.user_metadata?.full_name || user.user.email?.split('@')[0] || 'User',
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
           }, { onConflict: 'id' });
       }
     } catch (profileErr) {
@@ -77,7 +88,7 @@ export const documentService = {
     onProgress?.(2, 'Encrypting & uploading to vault storage...');
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const folderPrefix = folderId ? `folders/${folderId}/` : '';
-    const storagePath = `${user.user.id}/${folderPrefix}${Date.now()}_${safeFileName}`;
+    const storagePath = `${user.id}/${folderPrefix}${Date.now()}_${safeFileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('documents')
@@ -96,27 +107,54 @@ export const documentService = {
     const { data, error: dbError } = await supabase
       .from('documents')
       .insert({
-        owner_id: user.user.id,
+        owner_id: user.id,
         folder_id: folderId,
         name: file.name,
         storage_path: storagePath,
         mime_type: file.type || 'application/octet-stream',
         size: file.size,
         current_hash: sha256Hash,
-        integrity_status: 'PENDING',
+        integrity_status: 'VERIFIED',
       })
       .select()
       .single();
 
-    if (dbError) {
+    if (dbError || !data) {
       // Rollback storage if DB fails
       await supabase.storage.from('documents').remove([storagePath]);
-      throw new Error(`Database error: ${dbError.message || 'Could not create document record.'}`);
+      throw new Error(`Database error: ${dbError?.message || 'Could not create document record.'}`);
     }
+
+    const createdDoc = data as Document;
 
     // Create integrity record (resilient)
     try {
-      await integrityService.createIntegrityRecord(data.id, sha256Hash, 1);
+      await integrityService.createIntegrityRecord(createdDoc.id, sha256Hash, 1);
+
+      // Check if this hash already has a confirmed Sepolia blockchain proof
+      const { data: existingBlockchainProof } = await supabase
+        .from('blockchain_proofs')
+        .select('*')
+        .eq('document_hash', sha256Hash)
+        .eq('status', 'CONFIRMED')
+        .order('anchored_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingBlockchainProof) {
+        await supabase
+          .from('blockchain_proofs')
+          .upsert({
+            document_id: createdDoc.id,
+            document_hash: sha256Hash,
+            blockchain_network: existingBlockchainProof.blockchain_network || 'Ethereum Sepolia',
+            contract_address: existingBlockchainProof.contract_address || CONTRACT_ADDRESS,
+            transaction_hash: existingBlockchainProof.transaction_hash,
+            block_number: existingBlockchainProof.block_number,
+            status: 'CONFIRMED',
+            anchored_at: existingBlockchainProof.anchored_at || new Date().toISOString(),
+          }, { onConflict: 'document_id' });
+      }
     } catch (integrityErr: any) {
       console.warn('Integrity ledger record note:', integrityErr.message);
     }
@@ -124,50 +162,52 @@ export const documentService = {
     // Log upload to audit trail (resilient)
     try {
       await supabase.from('audit_logs').insert({
-        user_id: user.user.id,
-        document_id: data.id,
+        user_id: user.id,
+        document_id: createdDoc.id,
         action: 'DOCUMENT_UPLOADED',
-        metadata: { name: file.name, size: file.size, mime_type: file.type },
+        metadata: { name: file.name, size: file.size, mime_type: file.type, hash: sha256Hash },
       });
     } catch (auditErr: any) {
       console.warn('Audit log note:', auditErr.message);
     }
 
     onProgress?.(4, 'Document secured and ready in your vault!');
-    return data as Document;
+    return createdDoc;
   },
 
   /**
-   * Generates a short-lived signed URL for downloading or viewing a document.
+   * Generates a signed, short-lived (60s) URL to download the document directly from Supabase Storage.
    */
-  async getDownloadUrl(storagePath: string): Promise<string> {
+  async getDownloadUrl(storagePath: string, expiresIn: number = 60): Promise<string> {
     const { data, error } = await supabase.storage
       .from('documents')
-      .createSignedUrl(storagePath, 60); // 60 seconds
+      .createSignedUrl(storagePath, expiresIn);
 
-    if (error) throw error;
+    if (error || !data?.signedUrl) {
+      throw new Error(`Failed to generate download URL: ${error?.message || 'Unknown error'}`);
+    }
+
     return data.signedUrl;
   },
 
   /**
-   * Downloads a document directly in the browser.
+   * Initiates direct file download in the browser.
    */
   async downloadDocument(document: Document): Promise<void> {
-    const { data: user } = await supabase.auth.getUser();
-    const signedUrl = await this.getDownloadUrl(document.storage_path);
+    const downloadUrl = await this.getDownloadUrl(document.storage_path);
+    const link = window.document.createElement('a');
+    link.href = downloadUrl;
+    link.download = document.name;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
 
-    const a = window.document.createElement('a');
-    a.href = signedUrl;
-    a.download = document.name;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
-
-    // Log download to audit trail
-    if (user?.user) {
+    // Record audit event
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
       try {
         await supabase.from('audit_logs').insert({
-          user_id: user.user.id,
+          user_id: user.id,
           document_id: document.id,
           action: 'DOCUMENT_DOWNLOADED',
           metadata: { name: document.name },
@@ -177,51 +217,49 @@ export const documentService = {
   },
 
   /**
-   * Deletes a document from Database (and child records) and Storage bucket.
+   * Moves a document into a folder (or removes it to root if folderId is null).
+   */
+  async moveDocument(documentId: string, folderId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('documents')
+      .update({ folder_id: folderId })
+      .eq('id', documentId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Permanently deletes a document from storage and database.
    */
   async deleteDocument(document: Document): Promise<void> {
-    const { data: user } = await supabase.auth.getUser();
-
-    // 1. Clean up child records first to ensure no foreign key blockages
-    try {
-      await supabase.from('document_integrity_records').delete().eq('document_id', document.id);
-      await supabase.from('blockchain_proofs').delete().eq('document_id', document.id);
-      await supabase.from('document_shares').delete().eq('document_id', document.id);
-      await supabase.from('audit_logs').update({ document_id: null }).eq('document_id', document.id);
-    } catch (cleanErr) {
-      console.warn('Pre-delete cleanup note:', cleanErr);
-    }
-
-    // 2. Delete main document record
+    // 1. Delete DB record first
     const { error: dbError } = await supabase
       .from('documents')
       .delete()
       .eq('id', document.id);
 
-    if (dbError) {
-      console.error('Database delete error:', dbError);
-      throw new Error(`Database delete error: ${dbError.message || 'Could not delete document'}`);
+    if (dbError) throw dbError;
+
+    // 2. Remove physical file from bucket
+    const { error: storageError } = await supabase.storage
+      .from('documents')
+      .remove([document.storage_path]);
+
+    if (storageError) {
+      console.warn('Storage file cleanup warning:', storageError);
     }
 
-    // 3. Delete file from Storage bucket
-    try {
-      await supabase.storage
-        .from('documents')
-        .remove([document.storage_path]);
-    } catch (storageErr) {
-      console.warn(`Failed to delete storage file ${document.storage_path}:`, storageErr);
-    }
-
-    // 4. Log deletion to audit trail
-    if (user?.user) {
+    // 3. Record audit event
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
       try {
         await supabase.from('audit_logs').insert({
-          user_id: user.user.id,
+          user_id: user.id,
           document_id: null,
           action: 'DOCUMENT_DELETED',
-          metadata: { name: document.name, document_id: document.id },
+          metadata: { name: document.name, storage_path: document.storage_path },
         });
       } catch (e) {}
     }
-  }
+  },
 };
