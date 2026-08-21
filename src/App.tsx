@@ -14,7 +14,6 @@ import { FeaturesPage } from '@/pages/FeaturesPage';
 import { SecurityPage } from '@/pages/SecurityPage';
 import { HowItWorksPage } from '@/pages/HowItWorksPage';
 import { VerificationPage } from '@/pages/VerificationPage';
-import { SharingPage } from '@/pages/SharingPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { ContactPage } from '@/pages/ContactPage';
 
@@ -27,7 +26,6 @@ import { AuthCallbackPage } from '@/pages/auth/AuthCallbackPage';
 import { DashboardPage } from '@/pages/app/DashboardPage';
 import { VaultPage } from '@/pages/app/VaultPage';
 import { DocumentDetailPage } from '@/pages/app/DocumentDetailPage';
-import { SharePage } from '@/pages/app/SharePage';
 import { ActivityPage } from '@/pages/app/ActivityPage';
 import { ProfilePage } from '@/pages/app/ProfilePage';
 
@@ -43,7 +41,6 @@ export function App() {
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/verify" element={<VerificationPage />} />
-          <Route path="/sharing" element={<SharingPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
 
@@ -86,14 +83,6 @@ export function App() {
             element={
               <PrivateRoute>
                 <DocumentDetailPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/app/sharing"
-            element={
-              <PrivateRoute>
-                <SharePage />
               </PrivateRoute>
             }
           />

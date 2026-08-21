@@ -9,34 +9,26 @@ import {
   FileText, 
   ShieldCheck, 
   Link2, 
-  Share2, 
   Download, 
   Trash2, 
   ExternalLink, 
   CheckCircle, 
   AlertTriangle, 
-  Clock,
-  X,
-  Copy,
-  Check,
-  Shield,
-  Layers,
-  Sparkles,
-  RefreshCw,
-  Send,
-  Upload,
-  FileCheck,
-  FileX
+  Clock, 
+  Copy, 
+  Check, 
+  Shield, 
+  Upload, 
+  FileCheck, 
+  FileX 
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { supabase } from '@/lib/supabase';
 import { documentService } from '@/services/documentService';
 import { integrityService } from '@/services/integrityService';
 import { blockchainService } from '@/services/blockchainService';
-import { shareService } from '@/services/shareService';
-import { Document, BlockchainProof, SharePermission } from '@/types';
+import { Document, BlockchainProof } from '@/types';
 import { BLOCKCHAIN_EXPLORER_BASE, CONTRACT_EXPLORER_BASE, CONTRACT_ADDRESS } from '@/lib/constants';
 import { truncateHash, truncateTxHash, computeFileSha256 } from '@/lib/crypto';
 
@@ -61,13 +53,6 @@ export function DocumentDetailPage() {
     matches: boolean;
   } | null>(null);
   const [isTestingFile, setIsTestingFile] = useState(false);
-
-  // Share Modal State
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [shareRecipient, setShareRecipient] = useState('');
-  const [sharePermission, setSharePermission] = useState<SharePermission>('VIEW');
-  const [shareExpiry, setShareExpiry] = useState<'1h' | '24h' | '7d' | 'never'>('24h');
-  const [isSharing, setIsSharing] = useState(false);
 
   const loadDocumentData = async () => {
     if (!id) return;
@@ -99,46 +84,93 @@ export function DocumentDetailPage() {
     loadDocumentData();
   }, [id]);
 
-  const copyToClipboard = (text: string, fieldName: string) => {
+  const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedField(fieldName);
+    setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleVerify = async () => {
+  const handleVerifyIntegrity = async () => {
     if (!doc) return;
+    setVerifying(true);
+    setVerificationFeedback(null);
     try {
-      setVerifying(true);
-      setVerificationFeedback(null);
+      const isMatch = await integrityService.verifyDocument(doc);
+      setDoc(prev => prev ? { ...prev, integrity_status: isMatch ? 'VERIFIED' : 'FAILED' } : null);
 
-      const isLocalMatch = await integrityService.verifyDocument(doc);
-      const dualResult = await blockchainService.verifyDualIntegrity(
-        doc.name,
-        doc.current_hash || '',
-        doc.current_hash,
-        proof
-      );
-
-      if (isLocalMatch && dualResult.blockchainMatch !== false) {
-        setDoc({ ...doc, integrity_status: 'VERIFIED' });
+      if (isMatch) {
         setVerificationFeedback({
           success: true,
-          message: `✓ Cryptographic Integrity Verified: Cloud storage bytes exactly match the SHA-256 fingerprint. ${proof ? 'Confirmed on Ethereum Sepolia.' : 'Vault reference intact.'}`,
+          message: 'Cryptographic Integrity Confirmed: The document stored in vault cloud storage perfectly matches the recorded SHA-256 fingerprint.',
         });
       } else {
-        setDoc({ ...doc, integrity_status: 'FAILED' });
         setVerificationFeedback({
           success: false,
-          message: '⚠ Fingerprint Mismatch Detected: The file bytes differ from the registered reference record.',
+          message: 'Tamper Alert: The computed SHA-256 hash of the vault file does not match the immutable ledger record.',
         });
       }
     } catch (err: any) {
       setVerificationFeedback({
         success: false,
-        message: err.message || 'Could not verify document integrity.',
+        message: `Integrity check failed: ${err.message || 'Network error'}`,
       });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleAnchorBlockchain = async () => {
+    if (!doc) return;
+    setAnchoring(true);
+    try {
+      const newProof = await blockchainService.anchorDocument(doc.id);
+      setProof(newProof);
+      setVerificationFeedback({
+        success: true,
+        message: `Successfully anchored to Ethereum Sepolia smart contract! Block #${newProof.block_number || 'Confirmed'}.`,
+      });
+    } catch (err: any) {
+      setVerificationFeedback({
+        success: false,
+        message: `Blockchain anchoring error: ${err.message || 'Transaction failed'}`,
+      });
+    } finally {
+      setAnchoring(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!doc) return;
+    setDownloading(true);
+    try {
+      await documentService.downloadDocument(doc);
+    } catch (err: any) {
+      alert(err.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!doc) return;
+    if (!window.confirm(`Are you sure you want to permanently delete "${doc.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await documentService.deleteDocument(doc);
+      navigate('/app/vault');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete document');
+      setDeleting(false);
+    }
+  };
+
+  const handleTriggerTestFile = () => {
+    if (testFileInputRef.current) {
+      testFileInputRef.current.value = '';
+      testFileInputRef.current.click();
     }
   };
 
@@ -150,100 +182,27 @@ export function DocumentDetailPage() {
     setTestResult(null);
 
     try {
-      const hash = await computeFileSha256(file);
-      const expectedHash = (doc.current_hash || '').toLowerCase();
-      const matches = hash.toLowerCase() === expectedHash;
-
+      const computed = await computeFileSha256(file);
+      const matches = computed.toLowerCase() === (doc.current_hash || '').toLowerCase();
       setTestResult({
         testedFileName: file.name,
-        testedHash: hash,
+        testedHash: computed,
         matches,
       });
     } catch (err: any) {
-      alert('Failed to hash test file: ' + err.message);
+      alert(err.message || 'Failed to calculate hash of local file');
     } finally {
       setIsTestingFile(false);
     }
   };
 
-  const handleAnchor = async () => {
-    if (!doc) return;
-    try {
-      setAnchoring(true);
-      const newProof = await blockchainService.anchorDocument(doc.id);
-      setProof(newProof);
-      alert(`Proof Confirmed: An immutable proof for "${doc.name}" has been permanently recorded on ${newProof.blockchain_network}.`);
-    } catch (err: any) {
-      alert(err.message || 'Blockchain anchoring is currently unavailable.');
-    } finally {
-      setAnchoring(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!doc) return;
-    try {
-      setDownloading(true);
-      await documentService.downloadDocument(doc);
-    } catch (err: any) {
-      alert(err.message || 'Could not download document.');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!doc) return;
-    if (!window.confirm(`Permanently delete "${doc.name}" from your vault? This will remove the file and all associated proofs.`)) {
-      return;
-    }
-
-    try {
-      setDeleting(true);
-      await documentService.deleteDocument(doc);
-      navigate('/app/vault');
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete document.');
-      setDeleting(false);
-    }
-  };
-
-  const handleWebShare = async () => {
-    if (!doc) return;
-    await shareService.shareViaWeb(doc);
-    alert('Share link and document details copied to clipboard!');
-  };
-
-  const handleShareSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!doc || !shareRecipient.trim()) return;
-
-    let expiresAt: string | null = null;
-    const now = Date.now();
-    if (shareExpiry === '1h') expiresAt = new Date(now + 3600 * 1000).toISOString();
-    if (shareExpiry === '24h') expiresAt = new Date(now + 24 * 3600 * 1000).toISOString();
-    if (shareExpiry === '7d') expiresAt = new Date(now + 7 * 24 * 3600 * 1000).toISOString();
-
-    try {
-      setIsSharing(true);
-      await shareService.shareDocument(doc.id, shareRecipient.trim(), sharePermission, expiresAt);
-      setIsShareModalOpen(false);
-      setShareRecipient('');
-      alert(`Access granted for ${shareRecipient} (${sharePermission === 'DOWNLOAD' ? 'Download & View' : 'View Only'}).`);
-    } catch (err: any) {
-      alert(err.message || 'Could not grant share access.');
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
   const formatSize = (bytes: number) => {
     if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, {
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -255,9 +214,9 @@ export function DocumentDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="py-24 flex flex-col items-center justify-center text-slate-400">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-xs">Loading document record & cryptographic proofs...</p>
+        <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-3">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs">Loading document verification records...</p>
         </div>
       </AppLayout>
     );
@@ -266,11 +225,11 @@ export function DocumentDetailPage() {
   if (!doc) {
     return (
       <AppLayout>
-        <div className="py-16 text-center">
-          <p className="text-sm text-slate-500 mb-4">Document not found or access revoked.</p>
-          <Link to="/app/vault" className="text-xs text-indigo-600 font-semibold hover:underline">
-            ← Back to Vault
-          </Link>
+        <div className="py-20 text-center space-y-4">
+          <p className="text-sm text-slate-500">Document not found or inaccessible.</p>
+          <Button variant="primary" onClick={() => navigate('/app/vault')}>
+            Return to Vault
+          </Button>
         </div>
       </AppLayout>
     );
@@ -278,7 +237,7 @@ export function DocumentDetailPage() {
 
   return (
     <AppLayout>
-      {/* Hidden File Input for Tamper Testing */}
+      {/* Hidden file input for tamper checking */}
       <input
         ref={testFileInputRef}
         type="file"
@@ -286,34 +245,18 @@ export function DocumentDetailPage() {
         onChange={handleTestFileChosen}
       />
 
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Navigation & Action Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <Link
             to="/app/vault"
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white font-medium transition"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Vault</span>
+            <span>Back to Document Vault</span>
           </Link>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleWebShare}
-              className="gap-1.5 text-xs py-1.5"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share Link</span>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setIsShareModalOpen(true)}
-              className="gap-1.5 text-xs py-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Grant Access</span>
-            </Button>
             <Button
               variant="secondary"
               onClick={handleDownload}
@@ -321,7 +264,7 @@ export function DocumentDetailPage() {
               className="gap-1.5 text-xs py-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{downloading ? 'Downloading...' : 'Download'}</span>
+              <span>{downloading ? 'Downloading...' : 'Download File'}</span>
             </Button>
             <button
               onClick={handleDelete}
@@ -449,7 +392,7 @@ export function DocumentDetailPage() {
                   rel="noopener noreferrer"
                   className="font-mono text-indigo-600 hover:underline flex items-center gap-1"
                 >
-                  <span>{truncateTxHash(CONTRACT_ADDRESS)}</span>
+                  <span>{truncateTxHash(proof.contract_address || CONTRACT_ADDRESS)}</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
@@ -469,222 +412,111 @@ export function DocumentDetailPage() {
               )}
               {proof.block_number && (
                 <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
-                  <span className="text-slate-500">Mined Block Height</span>
+                  <span className="text-slate-500">Block Height</span>
                   <span className="font-semibold text-slate-900 dark:text-white">#{proof.block_number}</span>
                 </div>
               )}
               {proof.anchored_at && (
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Anchored Timestamp</span>
-                  <span className="text-slate-700 dark:text-slate-300">{formatDate(proof.anchored_at)}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{formatDate(proof.anchored_at)}</span>
                 </div>
               )}
             </div>
           ) : (
-            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-5 border border-dashed border-slate-200 dark:border-slate-700 text-center">
-              <p className="text-xs text-slate-500 mb-4 max-w-md mx-auto">
-                This document has not been anchored to Ethereum yet. Creating a blockchain proof records an unalterable timestamp on the public Sepolia ledger.
+            <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-5 text-center space-y-3">
+              <p className="text-xs text-slate-500">
+                This document's SHA-256 fingerprint has not been anchored to the Ethereum blockchain yet.
               </p>
               <Button
-                variant="primary"
-                onClick={handleAnchor}
-                disabled={anchoring || verifying}
-                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                variant="secondary"
+                size="sm"
+                onClick={handleAnchorBlockchain}
+                loading={anchoring}
+                className="gap-1.5 text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800"
               >
                 <Link2 className="w-3.5 h-3.5" />
-                <span>{anchoring ? 'Anchoring to Sepolia...' : 'Create Blockchain Proof'}</span>
+                <span>Anchor to Sepolia Blockchain</span>
               </Button>
             </div>
           )}
         </div>
 
-        {/* Interactive Live File Tamper-Tester */}
+        {/* Cryptographic Verification Action Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Search for Tamper
-              </h2>
-            </div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+              Verify Vault Cryptographic Integrity
+            </h2>
           </div>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Want to test if a file has been modified? Select any local file from your disk to compare its calculated cryptographic hash directly against this vault record and Sepolia blockchain proof.
+            Trigger a live server re-verification of this document: the system fetches the encrypted vault file from storage, re-computes its SHA-256 fingerprint, and compares it against the recorded ledger.
+          </p>
+          <Button
+            variant="primary"
+            onClick={handleVerifyIntegrity}
+            loading={verifying}
+            className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Verify Cryptographic Integrity</span>
+          </Button>
+        </div>
+
+        {/* Live Tamper-Check Simulation Area */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+              Search for Tamper (Compare Local File)
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Select a file from your computer to compute its SHA-256 fingerprint client-side and verify if it matches this vaulted document.
           </p>
 
           <Button
             variant="secondary"
-            onClick={() => testFileInputRef.current?.click()}
-            disabled={isTestingFile}
-            className="text-xs gap-1.5 py-2"
+            size="sm"
+            onClick={handleTriggerTestFile}
+            loading={isTestingFile}
+            className="gap-1.5 text-xs"
           >
-            <Upload className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{isTestingFile ? 'Calculating Hash...' : 'Pick Local File to Compare'}</span>
+            <Upload className="w-3.5 h-3.5" />
+            <span>Pick Local File to Compare</span>
           </Button>
 
-          {/* Test Comparison Result */}
           {testResult && (
             <div
-              className={`p-4 rounded-xl border text-xs space-y-2.5 animate-in fade-in duration-200 ${
+              className={`p-4 rounded-xl border text-xs space-y-2 animate-in fade-in duration-150 ${
                 testResult.matches
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300'
                   : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-300'
               }`}
             >
-              <div className="flex items-center gap-2 font-bold text-sm">
+              <div className="flex items-center gap-2 font-bold">
                 {testResult.matches ? (
                   <>
-                    <FileCheck className="w-5 h-5 text-emerald-600" />
-                    <span>✓ MATCH CONFIRMED: File is 100% Authentic</span>
+                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                    <span>✓ MATCH CONFIRMED (Unaltered File)</span>
                   </>
                 ) : (
                   <>
-                    <FileX className="w-5 h-5 text-rose-600" />
-                    <span>⚠ FINGERPRINT MISMATCH: File Has Been Altered / Modified!</span>
+                    <FileX className="w-4 h-4 text-rose-600" />
+                    <span>⚠ TAMPER DETECTED / DIFFERENT FILE</span>
                   </>
                 )}
               </div>
-
-              <div className="space-y-1 text-xs">
-                <p>
-                  <span className="font-semibold">Selected File:</span> {testResult.testedFileName}
-                </p>
-                <div className="p-2 rounded-lg bg-black/20 font-mono text-[11px] break-all select-all">
-                  Calculated Hash: {testResult.testedHash}
-                </div>
-                <div className="p-2 rounded-lg bg-black/20 font-mono text-[11px] break-all select-all">
-                  Vault Reference: {doc.current_hash}
-                </div>
-              </div>
-
-              <p className="text-[11px] italic">
-                {testResult.matches
-                  ? 'The local file bytes match the Sepolia-anchored SHA-256 fingerprint down to the exact bit.'
-                  : 'The local file bytes do not match the registered record. Even 1 modified letter or pixel breaks the signature.'}
+              <p className="text-[11px]">
+                Selected File: <span className="font-semibold">{testResult.testedFileName}</span>
               </p>
+              <div className="font-mono text-[10px] break-all bg-white/60 dark:bg-slate-900/60 p-2 rounded-lg border border-current/10">
+                {testResult.testedHash}
+              </div>
             </div>
           )}
         </div>
-
-        {/* Primary Verification Action */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Button
-            variant="primary"
-            onClick={handleVerify}
-            disabled={verifying || anchoring}
-            className="flex-1 py-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold shadow-md"
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>{verifying ? 'Re-Computing Cryptographic Signature...' : 'Verify Cloud Vault Binary'}</span>
-          </Button>
-        </div>
-
-        {/* Grant In-App Sharing Modal */}
-        {isShareModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Share2 className="w-4 h-4 text-indigo-600" />
-                  <span>Grant In-App Access</span>
-                </h3>
-                <button
-                  onClick={() => setIsShareModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleShareSubmit} className="space-y-4 text-xs">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Recipient Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="colleague@enterprise.com"
-                    value={shareRecipient}
-                    onChange={(e) => setShareRecipient(e.target.value)}
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Access Permission
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSharePermission('VIEW')}
-                      className={`p-2.5 rounded-lg border text-center font-medium transition ${
-                        sharePermission === 'VIEW'
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      View Only
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSharePermission('DOWNLOAD')}
-                      className={`p-2.5 rounded-lg border text-center font-medium transition ${
-                        sharePermission === 'DOWNLOAD'
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      Download & View
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Access Expiration
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['1h', '24h', '7d', 'never'] as const).map((exp) => (
-                      <button
-                        key={exp}
-                        type="button"
-                        onClick={() => setShareExpiry(exp)}
-                        className={`py-1.5 rounded-lg border text-center text-[11px] font-medium transition uppercase ${
-                          shareExpiry === exp
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                        }`}
-                      >
-                        {exp === 'never' ? 'Never' : exp}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsShareModalOpen(false)}
-                    className="text-xs"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={isSharing || !shareRecipient.trim()}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {isSharing ? 'Sharing...' : 'Grant Access'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

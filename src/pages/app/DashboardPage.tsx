@@ -1,6 +1,6 @@
 // ============================================================
 // TrustLink Web — Professional Dashboard Page
-// Complete feature parity with mobile app
+// Complete feature parity with mobile app: 3-Metric Streamlined Layout
 // ============================================================
 
 import React, { useState, useRef } from 'react';
@@ -9,16 +9,10 @@ import {
   FileText, 
   ShieldCheck, 
   Link2, 
-  Share2, 
   Upload, 
   ArrowRight, 
-  Activity,
-  Shield,
-  Layers,
-  Sparkles,
+  Shield, 
   Info,
-  CheckCircle,
-  X
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/Button';
@@ -45,10 +39,9 @@ export function DashboardPage() {
   const displayName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'User';
 
   const statCards = [
-    { label: 'Total Documents', value: stats.totalDocs, icon: <FileText className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40' },
-    { label: 'Verified Intact', value: stats.verifiedDocs, icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-    { label: 'Blockchain Proofs', value: stats.anchoredDocs, icon: <Link2 className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40' },
-    { label: 'Active Shares', value: stats.sharedDocs, icon: <Share2 className="w-5 h-5 text-amber-500" />, bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    { label: 'Total Vault Files', value: stats.totalDocs, icon: <FileText className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40', link: '/app/vault' },
+    { label: 'Verified Intact', value: stats.verifiedDocs, icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40', link: '/app/activity' },
+    { label: 'Blockchain Proofs', value: stats.anchoredDocs, icon: <Link2 className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40', link: '/app/activity' },
   ];
 
   const handleQuickUploadTrigger = () => {
@@ -138,7 +131,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* 4-Step Pipeline Summary Card */}
+        {/* Pipeline Summary Card */}
         <div className="bg-gradient-to-r from-indigo-900/10 via-slate-900/5 to-emerald-900/10 dark:from-indigo-950/40 dark:via-slate-900/40 dark:to-emerald-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -147,10 +140,10 @@ export function DashboardPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                  The TrustLink Guarantee
+                  The TrustLink Protocol
                 </p>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
-                  Store ➔ Protect (SHA-256) ➔ Anchor (Sepolia Blockchain) ➔ Verify & Share
+                  Vault Storage ➔ SHA-256 Digest ➔ Ethereum Sepolia Proof ➔ Mathematical Verification
                 </p>
               </div>
             </div>
@@ -164,12 +157,13 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Authoritative Metrics Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 3-Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {statCards.map((s) => (
-            <div
+            <Link
               key={s.label}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow transition"
+              to={s.link}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow hover:border-indigo-400 dark:hover:border-indigo-600 transition block"
             >
               <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>
                 {s.icon}
@@ -178,180 +172,78 @@ export function DashboardPage() {
                 {loading ? <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" /> : s.value}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">{s.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
 
         {/* Recent Documents & Quick Links */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Documents List */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Recent Documents
-              </h2>
-              <Link to="/app/vault" className="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-1">
-                <span>View All Vault</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-
-            {recentDocs.length === 0 ? (
-              <div className="text-center py-10 text-slate-400">
-                <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-xs">No documents uploaded yet.</p>
-                <button
-                  onClick={handleQuickUploadTrigger}
-                  className="text-xs text-indigo-600 font-semibold hover:underline mt-2 inline-block"
-                >
-                  Upload your first file
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {recentDocs.map((doc) => (
-                  <Link
-                    key={doc.id}
-                    to={`/app/documents/${doc.id}`}
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-100 dark:border-slate-700/50 transition group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 transition">
-                          {doc.name}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {(doc.size / 1024).toFixed(1)} KB • {new Date(doc.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                        doc.integrity_status === 'VERIFIED'
-                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400'
-                          : 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400'
-                      }`}
-                    >
-                      {doc.integrity_status}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick Navigation Hub */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
-              Security Hub
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Recent Documents
             </h2>
-
-            <Link
-              to="/app/vault"
-              className="block p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-sm group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Document Vault</p>
-                  <p className="text-[10px] text-slate-400">Organize and manage folders</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition" />
-              </div>
-            </Link>
-
-            <Link
-              to="/app/sharing"
-              className="block p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-sm group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0">
-                  <Share2 className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Access Management</p>
-                  <p className="text-[10px] text-slate-400">Control active & revoked shares</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition" />
-              </div>
-            </Link>
-
-            <Link
-              to="/app/activity"
-              className="block p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-sm group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Audit Timeline</p>
-                  <p className="text-[10px] text-slate-400">Immutable security logs</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition" />
-              </div>
+            <Link to="/app/vault" className="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-1">
+              <span>View All Vault</span>
+              <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-        </div>
 
-        {/* How It Works Explainer Modal */}
-        {showHowItWorks && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-indigo-600" />
-                  <span>How TrustLink Works</span>
-                </h3>
-                <button
-                  onClick={() => setShowHowItWorks(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3.5 text-xs text-slate-600 dark:text-slate-300">
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50">
-                  <p className="font-bold text-indigo-600 dark:text-indigo-400 mb-1">1. 📂 Secure Cloud Storage</p>
-                  <p className="leading-relaxed">Your files are stored in isolated private storage. No public URLs exist; access is exclusively granted via 60-second time-limited signed URLs.</p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50">
-                  <p className="font-bold text-emerald-600 dark:text-emerald-400 mb-1">2. 🔐 SHA-256 Digital Fingerprint</p>
-                  <p className="leading-relaxed">A mathematical 256-bit cryptographic signature is computed from your file's exact bytes. If even one letter or pixel changes, the hash breaks.</p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50">
-                  <p className="font-bold text-indigo-600 dark:text-indigo-400 mb-1">3. ⛓️ Ethereum Sepolia Smart Contract</p>
-                  <p className="leading-relaxed">Your document's fingerprint is permanently recorded on smart contract <code>0x1b9A...8D0E</code> on Sepolia, proving proof of existence and exact timestamp.</p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50">
-                  <p className="font-bold text-amber-600 dark:text-amber-400 mb-1">4. 🛡️ 1-Click Verification & Sharing</p>
-                  <p className="leading-relaxed">Re-verify file integrity anytime with 1 click, or share with colleagues via links or in-app access with duration presets and instant revocation.</p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex justify-end">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowHowItWorks(false)}
-                  className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  Got It
-                </Button>
-              </div>
+          {recentDocs.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <p className="text-xs">No documents vaulted yet.</p>
+              <Button
+                variant="primary"
+                onClick={handleQuickUploadTrigger}
+                className="mt-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Upload First File
+              </Button>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {recentDocs.map((doc) => (
+                <Link
+                  key={doc.id}
+                  to={`/app/documents/${doc.id}`}
+                  className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-xl transition group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 transition">
+                        {doc.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {new Date(doc.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
 
-        {/* Live Upload Progress & Animation Modal */}
-        <UploadProgressModal state={uploadProgress} />
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      doc.integrity_status === 'VERIFIED'
+                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        : doc.integrity_status === 'FAILED'
+                        ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'
+                        : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400'
+                    }`}
+                  >
+                    {doc.integrity_status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Upload Progress Modal */}
+      <UploadProgressModal
+        state={uploadProgress}
+        onClose={() => setUploadProgress(prev => ({ ...prev, visible: false }))}
+      />
     </AppLayout>
   );
 }

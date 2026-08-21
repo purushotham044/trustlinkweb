@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import { Document } from '@/types';
 import { computeFileSha256 } from '@/lib/crypto';
 import { integrityService } from './integrityService';
-import { CONTRACT_ADDRESS } from '@/lib/constants';
 
 export const documentService = {
   /**
@@ -49,8 +48,7 @@ export const documentService = {
   },
 
   /**
-   * Uploads a file to Supabase Storage, records it in PostgreSQL, and generates initial SHA-256 fingerprint.
-   * Auto-links existing blockchain proof if the same hash was already confirmed on Ethereum Sepolia.
+   * Uploads a file to Supabase Storage, records it in PostgreSQL with initial status PENDING.
    */
   async uploadDocument(
     file: File,
@@ -114,7 +112,7 @@ export const documentService = {
         mime_type: file.type || 'application/octet-stream',
         size: file.size,
         current_hash: sha256Hash,
-        integrity_status: 'VERIFIED',
+        integrity_status: 'PENDING', // Initial state upon upload is PENDING
       })
       .select()
       .single();
@@ -130,31 +128,6 @@ export const documentService = {
     // Create integrity record (resilient)
     try {
       await integrityService.createIntegrityRecord(createdDoc.id, sha256Hash, 1);
-
-      // Check if this hash already has a confirmed Sepolia blockchain proof
-      const { data: existingBlockchainProof } = await supabase
-        .from('blockchain_proofs')
-        .select('*')
-        .eq('document_hash', sha256Hash)
-        .eq('status', 'CONFIRMED')
-        .order('anchored_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingBlockchainProof) {
-        await supabase
-          .from('blockchain_proofs')
-          .upsert({
-            document_id: createdDoc.id,
-            document_hash: sha256Hash,
-            blockchain_network: existingBlockchainProof.blockchain_network || 'Ethereum Sepolia',
-            contract_address: existingBlockchainProof.contract_address || CONTRACT_ADDRESS,
-            transaction_hash: existingBlockchainProof.transaction_hash,
-            block_number: existingBlockchainProof.block_number,
-            status: 'CONFIRMED',
-            anchored_at: existingBlockchainProof.anchored_at || new Date().toISOString(),
-          }, { onConflict: 'document_id' });
-      }
     } catch (integrityErr: any) {
       console.warn('Integrity ledger record note:', integrityErr.message);
     }
@@ -171,7 +144,7 @@ export const documentService = {
       console.warn('Audit log note:', auditErr.message);
     }
 
-    onProgress?.(4, 'Document secured and ready in your vault!');
+    onProgress?.(4, 'Document vaulted and ready for verification!');
     return createdDoc;
   },
 
