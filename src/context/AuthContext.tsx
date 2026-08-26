@@ -15,6 +15,8 @@ export interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   initialized: boolean;
+  sendEmailOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
+  verifyEmailOtp: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
   signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
@@ -50,26 +52,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      setInitialized(true);
-    }).catch(err => {
-      console.warn('getSession error:', err);
+      if (s?.user) {
+        fetchProfile(s.user.id);
+      }
       setInitialized(true);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) await fetchProfile(s.user.id);
-      else setProfile(null);
-      setInitialized(true);
-    });
+    // Listen to changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, s) => {
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          fetchProfile(s.user.id);
+        } else {
+          setProfile(null);
+        }
+        setInitialized(true);
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  const handleSignUp = useCallback(async (email: string, password: string, fullName: string) => {
+  const handleSendEmailOtp = useCallback(async (email: string) => {
+    setLoading(true);
+    try {
+      return await authService.sendEmailOtp(email);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleVerifyEmailOtp = useCallback(async (email: string, token: string) => {
+    setLoading(true);
+    try {
+      return await authService.verifyEmailOtp(email, token);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSignUp = useCallback(async (
+    email: string,
+    password: string,
+    fullName: string
+  ) => {
     setLoading(true);
     try {
       return await authService.signUpWithEmail(email, password, fullName);
@@ -81,21 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignIn = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
-      const result = await authService.signInWithEmail(email, password);
-      if (result.success) {
-        // Immediately fetch the session so state updates before navigation
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (s) {
-          setSession(s);
-          setUser(s.user);
-          if (s.user) fetchProfile(s.user.id);
-        }
-      }
-      return result;
+      return await authService.signInWithEmail(email, password);
     } finally {
       setLoading(false);
     }
-  }, [fetchProfile]);
+  }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
     setLoading(true);
@@ -106,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const handleDemoSignIn = useCallback(() => {
+  const handleSignInAsDemo = useCallback(() => {
     const demoUser: any = {
       id: 'demo-user-0000-0000-000000000001',
       email: 'demo.analyst@trustlink.app',
@@ -152,10 +170,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         initialized,
+        sendEmailOtp: handleSendEmailOtp,
+        verifyEmailOtp: handleVerifyEmailOtp,
         signUpWithEmail: handleSignUp,
         signInWithEmail: handleSignIn,
         signInWithGoogle: handleGoogleSignIn,
-        signInAsDemo: handleDemoSignIn,
+        signInAsDemo: handleSignInAsDemo,
         signOut: handleSignOut,
         setUser,
       }}

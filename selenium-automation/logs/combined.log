@@ -1,0 +1,22 @@
+{"level":"info","message":"Creating Selenium WebDriver instance for: chrome (Headless: true)","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:27:58"}
+{"level":"info","message":"Creating Selenium WebDriver instance for: chrome (Headless: true)","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"MOCK_SELENIUM=true detected — forcing mock driver execution.","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/register","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:11"}
+{"level":"info","message":"Excel report created at: D:\\PDD\\trustlinkweb\\selenium-automation\\reports\\TrustLink_Web_QA_Report.xlsx","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:34:12"}
+{"level":"info","message":"Creating Selenium WebDriver instance for: chrome (Headless: true)","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"MOCK_SELENIUM=true detected — forcing mock driver execution.","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/register","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Excel report created at: D:\\PDD\\trustlinkweb\\selenium-automation\\reports\\TrustLink_Web_QA_Report.xlsx","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:36:03"}
+{"level":"info","message":"Creating Selenium WebDriver instance for: chrome (Headless: true)","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"MOCK_SELENIUM=true detected — forcing mock driver execution.","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/register","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"Navigating to URL: http://localhost:5173/login","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:02"}
+{"level":"info","message":"Excel report created at: D:\\PDD\\trustlinkweb\\selenium-automation\\reports\\TrustLink_Web_QA_Report.xlsx","service":"trustlink-qa-selenium","timestamp":"2026-08-25 14:47:03"}

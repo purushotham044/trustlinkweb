@@ -24,6 +24,49 @@ async function logAuthAudit(action: 'USER_LOGIN' | 'USER_LOGOUT' | 'USER_REGISTE
   } catch (e) {}
 }
 
+/**
+ * Sends a 6-digit OTP code to the given email address.
+ */
+export async function sendEmailOtp(email: string): Promise<AuthResult> {
+  const cleanEmail = email.trim().toLowerCase();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: cleanEmail,
+    options: {
+      shouldCreateUser: true,
+    },
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Verifies a 6-digit email OTP code and establishes an authenticated session.
+ */
+export async function verifyEmailOtp(email: string, token: string): Promise<AuthResult> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanToken = token.trim();
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanToken,
+    type: 'email',
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  if (data?.user?.id) {
+    await logAuthAudit('USER_LOGIN', data.user.id, { method: 'email_otp', email: cleanEmail });
+  }
+
+  return { success: true };
+}
+
 export async function signUpWithEmail(
   email: string,
   password: string,

@@ -1,14 +1,16 @@
 {
-  "timestamp": "2026-08-19T08:19:00.111Z",
-  "testType": "Load & High-Throughput Performance",
-  "totalRequests": 100,
-  "totalDurationMs": 6.24,
-  "averageLatencyMs": 0.058,
-  "p95LatencyMs": 0.143,
-  "throughputRps": 16021.8,
+  "timestamp": "2026-08-25T09:17:00.213Z",
+  "testType": "Baseline Load & Concurrency Performance",
+  "totalRequests": 22159,
+  "totalDurationMs": 61264,
+  "averageLatencyMs": 271.807,
+  "minLatencyMs": 49.41,
+  "maxLatencyMs": 1505.359,
+  "p95LatencyMs": 748.466,
+  "throughputRps": 361.7,
   "status": "PASSED",
   "metrics": {
-    "memoryHeapUsedMB": 5.28,
-    "cpuThroughputScore": 99.4
+    "memoryHeapUsedMB": 6.24,
+    "cpuThroughputScore": 99.8
   }
 }
